@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+log = "0.4.25"
+log4rs = "1.3.0"
 wayland-client = "0.31.8"
+wayland-protocols-wlr = { version = "0.3.6", features = ["client"] }
