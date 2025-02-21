@@ -12,7 +12,7 @@ use super::configs::Configurations;
 
 impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &ZwlrOutputManagerV1,
         _event: <ZwlrOutputManagerV1 as wayland_client::Proxy>::Event,
         _data: &(),
@@ -21,10 +21,10 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
     ) {
         match _event {
             Head { head } => {
-                println!("{:#?}", head);
+                state.add_head(head);
             }
             Done { serial } => {
-                println!("serial: {}", serial);
+                state.set_serial(serial);
             },
             Finished => {},
             _ => {},

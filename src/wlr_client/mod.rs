@@ -110,4 +110,8 @@ impl Client {
 
         Ok(())
     }
+
+    pub fn configurations(&self) -> &Configurations {
+        &self.configurations
+    }
 }
