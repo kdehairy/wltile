@@ -204,16 +204,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "layout-rs"
-version = "0.1.0"
-dependencies = [
- "log",
- "log4rs",
- "wayland-client",
- "wayland-protocols-wlr",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -724,6 +714,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbcebb399c77d5aa9fa5db874806ee7b4eba4e73650948e8f93963f128896615"
 dependencies = [
  "pkg-config",
+]
+
+[[package]]
+name = "wayout"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "log4rs",
+ "wayland-client",
+ "wayland-protocols-wlr",
 ]
 
 [[package]]
