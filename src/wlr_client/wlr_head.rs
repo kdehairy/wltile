@@ -29,11 +29,11 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
             match event {
                 Event::Name { name } => {
                     log::debug!("Head {}: name={}", head.id(), name);
-                    head.name = name
+                    head.name = name;
                 },
                 Event::Description { description } => {
                     log::trace!("Head {}: description={}", head.id(), description);
-                    head.description = description
+                    head.description = description;
                 },
                 Event::PhysicalSize { width, height } => head.physical_size = Point(width, height),
                 Event::Mode { mode } => {
@@ -44,22 +44,22 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
                 Event::Enabled { enabled } => head.enabled = !matches!(enabled, 0),
                 Event::CurrentMode { mode } => {
                     log::debug!("Head {}: current_mode={}", head.id(), mode.id());
-                    head.current_mode_id = mode.id()
+                    head.current_mode_id = mode.id();
                 },
                 Event::Position { x, y } => {
                     log::debug!("Head {}: position={}", head.id(), Point(x, y));
-                    head.position = Point(x, y)
+                    head.position = Point(x, y);
                 },
                 Event::Finished => {
                     kill_me_please = true;
                 }
                 Event::Make { make } => {
                     log::trace!("Head {}: make={}", head.id(), make);
-                    head.make = make
+                    head.make = make;
                 },
                 Event::Model { model } => {
                     log::trace!("Head {}: model={}", head.id(), model);
-                    head.model = model
+                    head.model = model;
                 },
                 Event::SerialNumber { serial_number } => head.serial_number = serial_number,
                 //AdaptiveSync { state: _ } | Transform { transform: _ } | Scale { scale: _ } => {}

@@ -23,7 +23,7 @@ impl Dispatch<ZwlrOutputModeV1, ()> for Configurations {
             match event {
                 Event::Size { width, height } => {
                     log::debug!("Mode {}: size={}", mode.id(), Point(width, height));
-                    mode.size = Point(width, height)
+                    mode.size = Point(width, height);
                 },
                 Event::Refresh { refresh } => mode.refresh = refresh,
                 Event::Preferred => mode.prefered = true,

@@ -8,11 +8,6 @@ use log4rs::{
 };
 
 pub fn setup() {
-
-    /*let file = File::create("target/app.log").unwrap();
-    env_logger::Builder::new()
-        .target(env_logger::Target::Pipe(Box::new(file)))
-        .init();*/
     let level = std::env::var("RUST_LOG").unwrap_or("INFO".to_string());
     let level = log::LevelFilter::from_str(&level).unwrap_or(log::LevelFilter::Info);
     let log_file = FileAppender::builder()

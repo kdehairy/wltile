@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Values, HashMap};
 
-use super::output_head::Head;
-use super::output_mode::Mode;
+use super::wlr_head::Head;
+use super::wlr_mode::Mode;
 use wayland_client::{backend::ObjectId, Proxy};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_head_v1::ZwlrOutputHeadV1, zwlr_output_mode_v1::ZwlrOutputModeV1,

@@ -1,7 +1,7 @@
 mod configs;
-mod output_head;
+mod wlr_head;
 mod output_manager;
-mod output_mode;
+mod wlr_mode;
 
 use configs::Configurations;
 
