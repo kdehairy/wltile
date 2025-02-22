@@ -24,7 +24,7 @@ fn main() {
     if heads.len() > 0 {
         println!("Found {} display(s):", heads.len());
         for head in heads {
-            println!("- {}", head);
+            println!("- {head}");
         }
     }
 }

@@ -22,13 +22,13 @@ impl Display for ClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ClientError::ConnectionError {msg} => {
-                write!(f, "failed to connect to wayland server: {}", msg)
+                write!(f, "failed to connect to wayland server: {msg}")
             }
             ClientError::BindingError {msg} => {
-                write!(f, "failed to bind to wayland object: {}", msg)
+                write!(f, "failed to bind to wayland object: {msg}")
             }
             ClientError::DispatchError {msg} => {
-                write!(f, "failed to dispatch message: {}", msg)
+                write!(f, "failed to dispatch message: {msg}")
             }
         }
     }
@@ -39,7 +39,7 @@ impl From<ConnectError> for ClientError {
         match value {
             ConnectError::NoWaylandLib | 
             ConnectError::InvalidFd |
-            ConnectError::NoCompositor => ClientError::ConnectionError { msg: format!("{}",value)},
+            ConnectError::NoCompositor => ClientError::ConnectionError { msg: format!("{value}")},
         }
     }
 }
@@ -48,7 +48,7 @@ impl From<BindError> for ClientError {
     fn from(value: BindError) -> Self {
         match value {
             BindError::UnsupportedVersion |
-            BindError::NotPresent => ClientError::BindingError { msg: format!("{}",value)},
+            BindError::NotPresent => ClientError::BindingError { msg: format!("{value}")},
         }
     }
 }
@@ -56,8 +56,8 @@ impl From<BindError> for ClientError {
 impl From<DispatchError> for ClientError {
     fn from(value: DispatchError) -> Self {
         match value {
-            DispatchError::BadMessage { sender_id: ref _i, interface: _, opcode: _ } => ClientError::DispatchError { msg: format!("{}",value)},
-            DispatchError::Backend(ref _i) => ClientError::DispatchError { msg: format!("{}",value)},
+            DispatchError::BadMessage { sender_id: ref _i, interface: _, opcode: _ } => ClientError::DispatchError { msg: format!("{value}")},
+            DispatchError::Backend(ref _i) => ClientError::DispatchError { msg: format!("{value}")},
         }
     }
 }
@@ -79,7 +79,7 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Configurations {
                 interface,
                 version,
             } => {
-                println!("[{}] {} (v{})", name, interface, version);
+                println!("[{name}] {interface} (v{version})");
             }
             wl_registry::Event::GlobalRemove { name: _ } => {}
             _ => {}
