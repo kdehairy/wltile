@@ -80,7 +80,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
 }
 
 
-pub struct Head {
+pub struct OutputHead {
     id: ObjectId,
     #[allow(clippy::struct_field_names)]
     wlr_head: ZwlrOutputHeadV1,
@@ -96,7 +96,7 @@ pub struct Head {
     serial_number: String,
 }
 
-impl Head {
+impl OutputHead {
     pub fn new(head: ZwlrOutputHeadV1) -> Self {
         Self {
             id: head.id(),
@@ -136,7 +136,7 @@ impl Head {
     }
 }
 
-impl Display for Head {
+impl Display for OutputHead {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,

@@ -34,7 +34,7 @@ impl Dispatch<ZwlrOutputModeV1, ()> for Configurations {
     }
 }
 
-pub struct Mode {
+pub struct OutputMode {
     id: ObjectId,
     //wlr_mode: ZwlrOutputModeV1,
     size: Point,
@@ -42,7 +42,7 @@ pub struct Mode {
     prefered: bool,
 }
 
-impl Mode {
+impl OutputMode {
     pub(crate) fn new(mode: &ZwlrOutputModeV1) -> Self {
         Self {
             id: mode.id(),
@@ -58,7 +58,7 @@ impl Mode {
     }
 }
 
-impl Display for Mode {
+impl Display for OutputMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} @{} [prefered: {}]", self.size, self.refresh, self.prefered)
     }
