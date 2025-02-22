@@ -27,21 +27,40 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
         let mut kill_me_please = false;
         if let Some(head) = state.get_head(&proxy.id()) {
             match event {
-                Event::Name { name } => head.name = name,
-                Event::Description { description } => head.description = description,
+                Event::Name { name } => {
+                    log::debug!("Head {}: name={}", head.id(), name);
+                    head.name = name
+                },
+                Event::Description { description } => {
+                    log::trace!("Head {}: description={}", head.id(), description);
+                    head.description = description
+                },
                 Event::PhysicalSize { width, height } => head.physical_size = Point(width, height),
                 Event::Mode { mode } => {
+                    log::trace!("Head {}: mode={}", head.id(), mode.id());
                     head.add_mode(&mode);
                     state.add_mode(&mode);
                 }
                 Event::Enabled { enabled } => head.enabled = !matches!(enabled, 0),
-                Event::CurrentMode { mode } => head.current_mode_id = mode.id(),
-                Event::Position { x, y } => head.position = Point(x, y),
+                Event::CurrentMode { mode } => {
+                    log::debug!("Head {}: current_mode={}", head.id(), mode.id());
+                    head.current_mode_id = mode.id()
+                },
+                Event::Position { x, y } => {
+                    log::debug!("Head {}: position={}", head.id(), Point(x, y));
+                    head.position = Point(x, y)
+                },
                 Event::Finished => {
                     kill_me_please = true;
                 }
-                Event::Make { make } => head.make = make,
-                Event::Model { model } => head.model = model,
+                Event::Make { make } => {
+                    log::trace!("Head {}: make={}", head.id(), make);
+                    head.make = make
+                },
+                Event::Model { model } => {
+                    log::trace!("Head {}: model={}", head.id(), model);
+                    head.model = model
+                },
                 Event::SerialNumber { serial_number } => head.serial_number = serial_number,
                 //AdaptiveSync { state: _ } | Transform { transform: _ } | Scale { scale: _ } => {}
                 _ => {}
@@ -62,6 +81,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
 
 
 pub struct Head {
+    id: ObjectId,
     #[allow(clippy::struct_field_names)]
     wlr_head: ZwlrOutputHeadV1,
     name: String,
@@ -79,6 +99,7 @@ pub struct Head {
 impl Head {
     pub fn new(head: ZwlrOutputHeadV1) -> Self {
         Self {
+            id: head.id(),
             wlr_head: head,
             name: String::default(),
             description: String::default(),
@@ -93,6 +114,10 @@ impl Head {
         }
     }
 
+    pub fn id(&self) -> &ObjectId {
+        &self.id
+    }
+
     pub fn release(&self) {
         //TODO: release modes
         self.wlr_head.release();
@@ -102,11 +127,11 @@ impl Head {
         self.mode_ids.push(mode.id());
     }
 
-    pub(crate) fn current_mode_id(&self) -> &ObjectId {
+    pub fn current_mode_id(&self) -> &ObjectId {
         &self.current_mode_id
     }
 
-    pub(crate) fn mode_ids(&self) -> &Vec<ObjectId> {
+    pub fn mode_ids(&self) -> &Vec<ObjectId> {
         &self.mode_ids
     }
 }
@@ -115,8 +140,8 @@ impl Display for Head {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {}: {} at position {}",
-            self.make, self.model, self.physical_size, self.position
+            "{} => {} {}: {} at position {}",
+            self.name, self.make, self.model, self.physical_size, self.position
         )
     }
 }

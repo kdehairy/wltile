@@ -7,6 +7,7 @@ use wayland_protocols_wlr::output_management::v1::client::{
     },
     zwlr_output_head_v1::ZwlrOutputHeadV1,
 };
+use wayland_client::Proxy;
 
 use super::configs::Configurations;
 
@@ -21,9 +22,11 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
     ) {
         match event {
             Head { head } => {
+                log::debug!("Found head {}", head.id());
                 state.add_head(head);
             }
             Done { serial } => {
+                log::debug!("serial: {}", serial);
                 state.set_serial(serial);
             },
             //Finished => {},
