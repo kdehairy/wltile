@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 
 use wayland_client::backend::ObjectId;
@@ -6,10 +5,7 @@ use wayland_client::Proxy;
 use wayland_client::{event_created_child, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_head_v1::{
-        Event::{
-            CurrentMode, Description, Enabled, Finished, Make, Mode, Model, Name,
-            PhysicalSize, Position, SerialNumber,
-        },
+        Event,
         ZwlrOutputHeadV1, EVT_MODE_OPCODE,
     },
     zwlr_output_manager_v1::ZwlrOutputManagerV1,
@@ -17,6 +13,7 @@ use wayland_protocols_wlr::output_management::v1::client::{
 };
 
 use super::configs::Configurations;
+use super::Point;
 
 impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
     fn event(
@@ -30,21 +27,22 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
         let mut kill_me_please = false;
         if let Some(head) = state.get_head(&proxy.id()) {
             match event {
-                Name { name } => head.name = name,
-                Description { description } => head.description = description,
-                PhysicalSize { width, height } => head.physical_size = Point(width, height),
-                Mode { mode } => {
-                    head.add_mode(mode);
+                Event::Name { name } => head.name = name,
+                Event::Description { description } => head.description = description,
+                Event::PhysicalSize { width, height } => head.physical_size = Point(width, height),
+                Event::Mode { mode } => {
+                    head.add_mode(&mode);
+                    state.add_mode(&mode);
                 }
-                Enabled { enabled } => head.enabled = !matches!(enabled, 0),
-                CurrentMode { mode } => head.current_mode = mode.id(),
-                Position { x, y } => head.position = Point(x, y),
-                Finished => {
+                Event::Enabled { enabled } => head.enabled = !matches!(enabled, 0),
+                Event::CurrentMode { mode } => head.current_mode_id = mode.id(),
+                Event::Position { x, y } => head.position = Point(x, y),
+                Event::Finished => {
                     kill_me_please = true;
                 }
-                Make { make } => head.make = make,
-                Model { model } => head.model = model,
-                SerialNumber { serial_number } => head.serial_number = serial_number,
+                Event::Make { make } => head.make = make,
+                Event::Model { model } => head.model = model,
+                Event::SerialNumber { serial_number } => head.serial_number = serial_number,
                 //AdaptiveSync { state: _ } | Transform { transform: _ } | Scale { scale: _ } => {}
                 _ => {}
             }
@@ -62,13 +60,6 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
     ]);
 }
 
-#[derive(Default)]
-struct Point(i32, i32);
-impl Display for Point {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {})", self.0, self.1)
-    }
-}
 
 pub struct Head {
     #[allow(clippy::struct_field_names)]
@@ -76,9 +67,9 @@ pub struct Head {
     name: String,
     description: String,
     physical_size: Point,
-    modes: HashMap<ObjectId, ZwlrOutputModeV1>,
+    mode_ids: Vec<ObjectId>,
+    current_mode_id: ObjectId,
     enabled: bool,
-    current_mode: ObjectId,
     position: Point,
     make: String,
     model: String,
@@ -92,9 +83,9 @@ impl Head {
             name: String::default(),
             description: String::default(),
             physical_size: Point::default(),
-            modes: HashMap::default(),
+            mode_ids: Vec::default(),
             enabled: bool::default(),
-            current_mode: ObjectId::null(),
+            current_mode_id: ObjectId::null(),
             position: Point::default(),
             make: String::default(),
             model: String::default(),
@@ -107,8 +98,16 @@ impl Head {
         self.wlr_head.release();
     }
 
-    fn add_mode(&mut self, mode: ZwlrOutputModeV1) {
-        self.modes.insert(mode.id(), mode);
+    fn add_mode(&mut self, mode: &ZwlrOutputModeV1) {
+        self.mode_ids.push(mode.id());
+    }
+
+    pub(crate) fn current_mode_id(&self) -> &ObjectId {
+        &self.current_mode_id
+    }
+
+    pub(crate) fn mode_ids(&self) -> &Vec<ObjectId> {
+        &self.mode_ids
     }
 }
 

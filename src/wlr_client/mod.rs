@@ -11,6 +11,14 @@ use wayland_client::protocol::wl_registry::{self};
 use wayland_client::{ConnectError, Connection, Dispatch, DispatchError};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
+#[derive(Default)]
+pub struct Point(i32, i32);
+impl Display for Point {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.0, self.1)
+    }
+}
+
 #[derive(Debug)]
 pub enum ClientError {
     Connection {msg: String},

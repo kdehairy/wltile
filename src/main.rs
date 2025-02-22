@@ -23,6 +23,13 @@ fn main() {
         println!("Found {} display(s):", heads.len());
         for head in heads {
             println!("- {head}");
+            for id in head.mode_ids() {
+                if let Some(mode) = configs.get_mode(id) {
+                    if mode.id() == head.current_mode_id() {
+                        println!("  * {mode}");
+                    }
+                }
+            }
         }
     }
 }
