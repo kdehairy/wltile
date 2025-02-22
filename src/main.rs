@@ -1,7 +1,7 @@
 #![warn(
     clippy::all,
     clippy::pedantic,
-    clippy::print_stdout,
+    //clippy::print_stdout,
     clippy::arithmetic_side_effects,
     clippy::as_conversions,
     clippy::integer_division
@@ -10,12 +10,10 @@
 mod logging;
 mod wlr_client;
 
-use logging::setup_logging;
-
 use log::info;
 
 fn main() {
-    setup_logging();
+    logging::setup();
     info!("===Started===");
     let mut client = wlr_client::Client::new();
     let _res = client.connect();

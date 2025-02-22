@@ -7,8 +7,8 @@ use wayland_client::{event_created_child, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_head_v1::{
         Event::{
-            AdaptiveSync, CurrentMode, Description, Enabled, Finished, Make, Mode, Model, Name,
-            PhysicalSize, Position, Scale, SerialNumber, Transform,
+            CurrentMode, Description, Enabled, Finished, Make, Mode, Model, Name,
+            PhysicalSize, Position, SerialNumber,
         },
         ZwlrOutputHeadV1, EVT_MODE_OPCODE,
     },
@@ -39,15 +39,13 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
                 Enabled { enabled } => head.enabled = !matches!(enabled, 0),
                 CurrentMode { mode } => head.current_mode = mode.id(),
                 Position { x, y } => head.position = Point(x, y),
-                Transform { transform: _ } => {}
-                Scale { scale: _ } => {}
                 Finished => {
                     kill_me_please = true;
                 }
                 Make { make } => head.make = make,
                 Model { model } => head.model = model,
                 SerialNumber { serial_number } => head.serial_number = serial_number,
-                AdaptiveSync { state: _ } => {}
+                //AdaptiveSync { state: _ } | Transform { transform: _ } | Scale { scale: _ } => {}
                 _ => {}
             }
         }
@@ -73,7 +71,8 @@ impl Display for Point {
 }
 
 pub struct Head {
-    head: ZwlrOutputHeadV1,
+    #[allow(clippy::struct_field_names)]
+    wlr_head: ZwlrOutputHeadV1,
     name: String,
     description: String,
     physical_size: Point,
@@ -89,7 +88,7 @@ pub struct Head {
 impl Head {
     pub fn new(head: ZwlrOutputHeadV1) -> Self {
         Self {
-            head,
+            wlr_head: head,
             name: String::default(),
             description: String::default(),
             physical_size: Point::default(),
@@ -105,7 +104,7 @@ impl Head {
 
     pub fn release(&self) {
         //TODO: release modes
-        self.head.release();
+        self.wlr_head.release();
     }
 
     fn add_mode(&mut self, mode: ZwlrOutputModeV1) {
@@ -115,6 +114,10 @@ impl Head {
 
 impl Display for Head {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} {}: {} at position {}", self.make, self.model, self.physical_size, self.position)
+        write!(
+            f,
+            "{} {}: {} at position {}",
+            self.make, self.model, self.physical_size, self.position
+        )
     }
 }

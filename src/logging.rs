@@ -5,7 +5,7 @@ use log4rs::{
     Config,
 };
 
-pub fn setup_logging() {
+pub fn setup() {
 
     /*let file = File::create("target/app.log").unwrap();
     env_logger::Builder::new()

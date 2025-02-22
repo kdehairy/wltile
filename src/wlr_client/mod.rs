@@ -13,21 +13,21 @@ use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1
 
 #[derive(Debug)]
 pub enum ClientError {
-    ConnectionError {msg: String},
-    BindingError {msg: String},
-    DispatchError { msg: String},
+    Connection {msg: String},
+    Binding {msg: String},
+    Dispatch { msg: String},
 }
 
 impl Display for ClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ClientError::ConnectionError {msg} => {
+            ClientError::Connection {msg} => {
                 write!(f, "failed to connect to wayland server: {msg}")
             }
-            ClientError::BindingError {msg} => {
+            ClientError::Binding {msg} => {
                 write!(f, "failed to bind to wayland object: {msg}")
             }
-            ClientError::DispatchError {msg} => {
+            ClientError::Dispatch {msg} => {
                 write!(f, "failed to dispatch message: {msg}")
             }
         }
@@ -39,7 +39,7 @@ impl From<ConnectError> for ClientError {
         match value {
             ConnectError::NoWaylandLib | 
             ConnectError::InvalidFd |
-            ConnectError::NoCompositor => ClientError::ConnectionError { msg: format!("{value}")},
+            ConnectError::NoCompositor => ClientError::Connection { msg: format!("{value}")},
         }
     }
 }
@@ -48,7 +48,7 @@ impl From<BindError> for ClientError {
     fn from(value: BindError) -> Self {
         match value {
             BindError::UnsupportedVersion |
-            BindError::NotPresent => ClientError::BindingError { msg: format!("{value}")},
+            BindError::NotPresent => ClientError::Binding { msg: format!("{value}")},
         }
     }
 }
@@ -56,8 +56,8 @@ impl From<BindError> for ClientError {
 impl From<DispatchError> for ClientError {
     fn from(value: DispatchError) -> Self {
         match value {
-            DispatchError::BadMessage { sender_id: ref _i, interface: _, opcode: _ } => ClientError::DispatchError { msg: format!("{value}")},
-            DispatchError::Backend(ref _i) => ClientError::DispatchError { msg: format!("{value}")},
+            DispatchError::BadMessage { sender_id: ref _i, interface: _, opcode: _ } => ClientError::Dispatch { msg: format!("{value}")},
+            DispatchError::Backend(ref _i) => ClientError::Dispatch { msg: format!("{value}")},
         }
     }
 }
@@ -68,22 +68,11 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Configurations {
     fn event(
         _state: &mut Self,
         _proxy: &wl_registry::WlRegistry,
-        event: <wl_registry::WlRegistry as wayland_client::Proxy>::Event,
+        _event: <wl_registry::WlRegistry as wayland_client::Proxy>::Event,
         _data: &GlobalListContents,
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        match event {
-            wl_registry::Event::Global {
-                name,
-                interface,
-                version,
-            } => {
-                println!("[{name}] {interface} (v{version})");
-            }
-            wl_registry::Event::GlobalRemove { name: _ } => {}
-            _ => {}
-        }
     }
 }
 

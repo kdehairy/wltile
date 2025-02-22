@@ -1,7 +1,7 @@
 use wayland_client::{event_created_child, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_manager_v1::{
-        Event::Done, Event::Finished, Event::Head, 
+        Event::Done, Event::Head, 
         ZwlrOutputManagerV1,
         EVT_HEAD_OPCODE,
     },
@@ -14,19 +14,19 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
     fn event(
         state: &mut Self,
         _proxy: &ZwlrOutputManagerV1,
-        _event: <ZwlrOutputManagerV1 as wayland_client::Proxy>::Event,
+        event: <ZwlrOutputManagerV1 as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        match _event {
+        match event {
             Head { head } => {
                 state.add_head(head);
             }
             Done { serial } => {
                 state.set_serial(serial);
             },
-            Finished => {},
+            //Finished => {},
             _ => {},
         }
     }
