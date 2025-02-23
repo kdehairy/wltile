@@ -1,3 +1,5 @@
+use std::collections::hash_map::Values;
+use std::collections::HashMap;
 use std::fmt::Display;
 
 use super::wlr_client::configs::Configurations;
@@ -5,13 +7,13 @@ use super::wlr_client::wlr_head::OutputHead;
 use super::wlr_client::Point;
 
 pub struct Heads<'a> {
-    heads: Vec<Head<'a>>,
+    heads: HashMap<&'a str, Head<'a>>,
 }
 
 impl<'a> Heads<'a> {
     pub fn new(configs: &'a Configurations) -> Result<Self, String> {
         let mut heads = Self {
-            heads: Vec::default(),
+            heads: HashMap::default(),
         };
         for wlr_head in configs.heads() {
             let head = Head {
@@ -31,7 +33,7 @@ impl<'a> Heads<'a> {
                     }
                 },
             };
-            heads.heads.push(head);
+            heads.heads.insert(head.name, head);
         }
         Ok(heads)
     }
@@ -52,8 +54,12 @@ impl<'a> Heads<'a> {
         None
     }
 
-    pub fn heads(&self) -> &[Head<'a>] {
-        &self.heads
+    pub fn heads(&self) -> Values<'_, &str, Head> {
+        self.heads.values()
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Head> {
+        self.heads.get(name)
     }
 }
 
