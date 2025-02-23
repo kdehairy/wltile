@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use super::wlr_client::Point;
 use super::wlr_client::configs::Configurations;
 use super::wlr_client::wlr_head::OutputHead;
+use super::wlr_client::Point;
 
 pub struct Heads<'a> {
     heads: Vec<Head<'a>>,
@@ -45,9 +45,8 @@ impl<'a> Heads<'a> {
                         _refresh: mode.refresh(),
                         _prefered: mode.prefered(),
                     });
-                } else {
-                    return None;
                 }
+                return None;
             }
         }
         None
@@ -62,6 +61,12 @@ pub struct Mode<'a> {
     size: &'a Point,
     _refresh: i32,
     _prefered: bool,
+}
+
+impl<'a> Mode<'a> {
+    pub fn size(&self) -> &Point {
+        self.size
+    }
 }
 
 pub struct Head<'a> {
@@ -80,10 +85,34 @@ impl<'a> Head<'a> {
     pub fn enabled(&self) -> bool {
         self.enabled
     }
+
+    pub fn name(&self) -> &str {
+        self.name
+    }
+
+    pub fn position(&self) -> &Point {
+        self.position
+    }
+
+    pub fn make(&self) -> &str {
+        self.make
+    }
+
+    pub fn model(&self) -> &str {
+        self.model
+    }
+
+    pub fn mode(&self) -> &Mode<'a> {
+        &self.mode
+    }
 }
 
 impl<'a> Display for Head<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} => {} {} {} @ {}", self.name, self.make, self.model, self.mode.size, self.position)
+        write!(
+            f,
+            "{} => {} {} {} @ {}",
+            self.name, self.make, self.model, self.mode.size, self.position
+        )
     }
 }
