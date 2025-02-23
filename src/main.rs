@@ -7,33 +7,34 @@
     clippy::integer_division
 )]
 
+mod cli;
 mod heads;
 mod logging;
 mod wlr_client;
+mod functions;
 
+use clap::Parser;
 use heads::Heads;
+use cli::Cli;
+use cli::Commands;
 
 use log::info;
-
-use colored::{Color, Colorize};
-
-const GRAY_COLOR: Color = Color::TrueColor { r: 88, g: 88, b: 88 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     logging::setup();
     info!("===Started===");
+
+    let args = Cli::parse();
+
     let mut client = wlr_client::Client::new();
     client.connect()?;
     let configs = client.configurations();
     let heads = Heads::new(configs)?;
-    for head in heads.heads() {
-        if head.enabled() {
-            println!("{}:", head.name().bold());
-            println!("\tMake: {} {}", head.make(), head.model().color(GRAY_COLOR));
-            println!("\tSize: {} x {}", head.mode().size().0, head.mode().size().1);
-            println!("\tPosition: {}", head.position());
-        }
+
+    match args.command {
+        Commands::List {} => functions::list::exec(&heads),
     }
 
+    info!("===Finished===");
     Ok(())
 }
