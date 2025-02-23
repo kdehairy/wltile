@@ -43,7 +43,7 @@ pub struct OutputMode {
 }
 
 impl OutputMode {
-    pub(crate) fn new(mode: &ZwlrOutputModeV1) -> Self {
+    pub fn new(mode: &ZwlrOutputModeV1) -> Self {
         Self {
             id: mode.id(),
             //wlr_mode: mode,
@@ -53,8 +53,20 @@ impl OutputMode {
         }
     }
 
-    pub(crate) fn id(&self) -> &ObjectId {
+    pub fn id(&self) -> &ObjectId {
         &self.id
+    }
+
+    pub fn size(&self) -> &Point {
+        &self.size
+    }
+
+    pub fn refresh(&self) -> i32 {
+        self.refresh
+    }
+
+    pub fn prefered(&self) -> bool {
+        self.prefered
     }
 }
 

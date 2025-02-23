@@ -134,6 +134,38 @@ impl OutputHead {
     pub fn mode_ids(&self) -> &Vec<ObjectId> {
         &self.mode_ids
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+
+    pub fn physical_size(&self) -> &Point {
+        &self.physical_size
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn position(&self) -> &Point {
+        &self.position
+    }
+
+    pub fn make(&self) -> &str {
+        &self.make
+    }
+
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    pub fn serial_number(&self) -> &str {
+        &self.serial_number
+    }
 }
 
 impl Display for OutputHead {

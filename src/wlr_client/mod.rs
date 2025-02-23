@@ -1,5 +1,5 @@
-mod configs;
-mod wlr_head;
+pub mod configs;
+pub mod wlr_head;
 mod output_manager;
 mod wlr_mode;
 

@@ -7,29 +7,26 @@
     clippy::integer_division
 )]
 
+mod heads;
 mod logging;
 mod wlr_client;
 
+use heads::Heads;
+
 use log::info;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     logging::setup();
     info!("===Started===");
     let mut client = wlr_client::Client::new();
     let _res = client.connect();
     let configs = client.configurations();
-    let heads = configs.heads();
-    if heads.len() > 0 {
-        println!("Found {} display(s):", heads.len());
-        for head in heads {
-            println!("- {head}");
-            for id in head.mode_ids() {
-                if let Some(mode) = configs.get_mode(id) {
-                    if mode.id() == head.current_mode_id() {
-                        println!("  * {mode}");
-                    }
-                }
-            }
+    let heads = Heads::new(configs)?;
+    for head in heads.heads() {
+        if head.enabled() {
+            println!("{head}");
         }
     }
+
+    Ok(())
 }
