@@ -25,7 +25,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         let mut kill_me_please = false;
-        if let Some(head) = state.get_head(&proxy.id()) {
+        if let Some(head) = state.get_head_mut(&proxy.id()) {
             match event {
                 Event::Name { name } => {
                     log::debug!("Head {}: name={}", head.id(), name);
@@ -62,7 +62,11 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
                     head.model = model;
                 },
                 Event::SerialNumber { serial_number } => head.serial_number = serial_number,
-                //AdaptiveSync { state: _ } | Transform { transform: _ } | Scale { scale: _ } => {}
+                Event::Scale { scale } => {
+                    log::trace!("Head {}: scale={}", head.id(), scale);
+                    head.scale = scale;
+                },
+                //Event::AdaptiveSync { state: _ } | Event::Transform { transform: _ } => {},
                 _ => {}
             }
         }
@@ -80,6 +84,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
 }
 
 
+#[derive(Debug)]
 pub struct OutputHead {
     id: ObjectId,
     #[allow(clippy::struct_field_names)]
@@ -94,6 +99,7 @@ pub struct OutputHead {
     make: String,
     model: String,
     serial_number: String,
+    scale: f64,
 }
 
 impl OutputHead {
@@ -111,6 +117,7 @@ impl OutputHead {
             make: String::default(),
             model: String::default(),
             serial_number: String::default(),
+            scale: f64::default(),
         }
     }
 
@@ -139,11 +146,11 @@ impl OutputHead {
         &self.name
     }
 
-    pub fn description(&self) -> &str {
+    pub fn _description(&self) -> &str {
         &self.description
     }
 
-    pub fn physical_size(&self) -> &Point {
+    pub fn _physical_size(&self) -> &Point {
         &self.physical_size
     }
 
@@ -163,8 +170,16 @@ impl OutputHead {
         &self.model
     }
 
-    pub fn serial_number(&self) -> &str {
+    pub fn _serial_number(&self) -> &str {
         &self.serial_number
+    }
+
+    pub fn wlr_head(&self) -> &ZwlrOutputHeadV1 {
+        &self.wlr_head
+    }
+
+    pub fn scale(&self) -> f64 {
+        self.scale
     }
 }
 

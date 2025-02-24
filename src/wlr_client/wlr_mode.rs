@@ -61,11 +61,11 @@ impl OutputMode {
         &self.size
     }
 
-    pub fn refresh(&self) -> i32 {
+    pub fn _refresh(&self) -> i32 {
         self.refresh
     }
 
-    pub fn prefered(&self) -> bool {
+    pub fn _prefered(&self) -> bool {
         self.prefered
     }
 }

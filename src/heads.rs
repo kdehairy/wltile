@@ -2,12 +2,14 @@ use std::collections::hash_map::Values;
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use crate::wlr_client::wlr_mode::OutputMode;
+
 use super::wlr_client::configs::Configurations;
 use super::wlr_client::wlr_head::OutputHead;
 use super::wlr_client::Point;
 
 pub struct Heads<'a> {
-    heads: HashMap<&'a str, Head<'a>>,
+    heads: HashMap<String, Head<'a>>,
 }
 
 impl<'a> Heads<'a> {
@@ -15,46 +17,29 @@ impl<'a> Heads<'a> {
         let mut heads = Self {
             heads: HashMap::default(),
         };
-        for wlr_head in configs.heads() {
+        for output_head in configs.heads() {
             let head = Head {
-                name: wlr_head.name(),
-                _description: wlr_head.description(),
-                _physical_size: wlr_head.physical_size(),
-                enabled: wlr_head.enabled(),
-                position: wlr_head.position(),
-                make: wlr_head.make(),
-                model: wlr_head.model(),
-                _serial_number: wlr_head.serial_number(),
-                mode: {
-                    if let Some(mode) = Self::find_current_mode(wlr_head, configs) {
+                output_head,
+                current_mode: {
+                    if let Some(mode) = Self::find_current_mode(output_head, configs) {
                         mode
                     } else {
                         return Err(String::from("failed to find current mode"));
                     }
                 },
             };
-            heads.heads.insert(head.name, head);
+            heads.heads.insert(output_head.name().to_string(), head);
         }
         Ok(heads)
     }
 
-    fn find_current_mode(wlr_head: &OutputHead, configs: &'a Configurations) -> Option<Mode<'a>> {
-        for id in wlr_head.mode_ids() {
-            if let Some(mode) = configs.get_mode(id) {
-                if mode.id() == wlr_head.current_mode_id() {
-                    return Some(Mode {
-                        size: mode.size(),
-                        _refresh: mode.refresh(),
-                        _prefered: mode.prefered(),
-                    });
-                }
-                return None;
-            }
-        }
-        None
+    fn find_current_mode(wlr_head: &'a OutputHead, configs: &'a Configurations) -> Option<&'a OutputMode> {
+        wlr_head.mode_ids().iter()
+            .find(|&id| id == wlr_head.current_mode_id())
+            .map(|id| configs.get_mode(id))?
     }
 
-    pub fn heads(&self) -> Values<'_, &str, Head> {
+    pub fn heads(&self) -> Values<'_, String, Head> {
         self.heads.values()
     }
 
@@ -63,62 +48,53 @@ impl<'a> Heads<'a> {
     }
 }
 
-pub struct Mode<'a> {
-    size: &'a Point,
-    _refresh: i32,
-    _prefered: bool,
-}
-
-impl<'a> Mode<'a> {
-    pub fn size(&self) -> &Point {
-        self.size
-    }
-}
-
+#[derive(Clone)]
 pub struct Head<'a> {
-    name: &'a str,
-    _description: &'a str,
-    _physical_size: &'a Point,
-    mode: Mode<'a>,
-    enabled: bool,
-    position: &'a Point,
-    make: &'a str,
-    model: &'a str,
-    _serial_number: &'a str,
+    output_head: &'a OutputHead,
+    current_mode: &'a OutputMode,
 }
 
 impl<'a> Head<'a> {
-    pub fn enabled(&self) -> bool {
-        self.enabled
+    pub fn mode(&self) -> &OutputMode {
+        self.current_mode
     }
 
     pub fn name(&self) -> &str {
-        self.name
+        self.output_head.name()
     }
 
-    pub fn position(&self) -> &Point {
-        self.position
+    pub fn enabled(&self) -> bool {
+        self.output_head.enabled()
     }
 
     pub fn make(&self) -> &str {
-        self.make
+        self.output_head.make()
     }
 
     pub fn model(&self) -> &str {
-        self.model
+        self.output_head.model()
     }
 
-    pub fn mode(&self) -> &Mode<'a> {
-        &self.mode
+    pub fn position(&self) -> &Point {
+        self.output_head.position()
+    }
+
+    pub fn output_head(&self) -> &OutputHead {
+        self.output_head
+    }
+
+    pub fn scale(&self) -> f64 {
+        self.output_head.scale()
     }
 }
 
 impl<'a> Display for Head<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let head = self.output_head;
         write!(
             f,
             "{} => {} {} {} @ {}",
-            self.name, self.make, self.model, self.mode.size, self.position
+            head.name(), head.make(), head.model(), self.current_mode.size(), head.position()
         )
     }
 }

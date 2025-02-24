@@ -31,7 +31,7 @@ pub enum Commands {
         reference: String,
 
         /// Alignment
-        #[arg(value_name="ALIGNMENT")]
+        #[arg(value_name="ALIGNMENT", default_value_t= Alignment::AlignBottom)]
         alignment: Alignment,
     },
 }
@@ -60,8 +60,8 @@ pub enum Alignment {
 impl Display for Alignment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Alignment::AlignBottom => write!(f, "align to bottom"),
-            Alignment::AlignTop => write!(f, "align to top"),
+            Alignment::AlignBottom => write!(f, "align-bottom"),
+            Alignment::AlignTop => write!(f, "align-top"),
         }
     }
 }

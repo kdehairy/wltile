@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Values, HashMap};
+use std::collections::HashMap;
 
 use super::wlr_head::OutputHead;
 use super::wlr_mode::OutputMode;
@@ -31,7 +31,7 @@ impl Configurations {
         self.serial = serial;
     }
 
-    pub fn get_head(&mut self, id: &ObjectId) -> Option<&mut OutputHead> {
+    pub fn get_head_mut(&mut self, id: &ObjectId) -> Option<&mut OutputHead> {
         self.heads.get_mut(id)
     }
 
@@ -43,8 +43,12 @@ impl Configurations {
         self.modes.get(id)
     }
 
-    pub fn heads(&self) -> Values<'_, ObjectId, OutputHead> {
-        self.heads.values()
+    pub fn heads(&self) -> Vec<&OutputHead> {
+        self.heads.values().collect()
+    }
+
+    pub(crate) fn serial(&self) -> u32 {
+        self.serial
     }
 
 }
