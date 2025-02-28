@@ -126,7 +126,6 @@ impl OutputHead {
     }
 
     pub fn release(&self) {
-        //TODO: release modes
         self.wlr_head.release();
     }
 

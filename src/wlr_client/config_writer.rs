@@ -127,7 +127,11 @@ impl ConfigWriter {
         }
     }
 
-    pub fn write(&mut self, request: &UpdateRequest, output_manager: &ZwlrOutputManagerV1) -> bool {
+    pub fn write(
+        &mut self,
+        request: &UpdateRequest,
+        output_manager: &ZwlrOutputManagerV1,
+    ) -> Result<(), String> {
         let output_configuration =
             output_manager.create_configuration(request.serial, &self.queue_handle, ());
         let mut appy_please = false;
@@ -143,13 +147,15 @@ impl ConfigWriter {
         if appy_please {
             log::info!("Applying new configurations");
             output_configuration.apply();
-            self.queue.roundtrip(&mut self.state).unwrap();
-            if let Ok(status) = self.status_receiver.recv_timeout(Duration::new(5, 0)) {
-                return status == Status::Succeeded;
+            if let Err(err) = self.queue.roundtrip(&mut self.state) {
+                return Err(format!("error sending request to compositor: {err}"));
             }
-            return false;
+            if let Ok(Status::Succeeded) = self.status_receiver.recv_timeout(Duration::new(5, 0)) {
+                return Ok(());
+            }
+            return Err(String::from("failed to update configurations"));
         }
-        true
+        Ok(())
     }
 
     fn reconcile_head_configs(

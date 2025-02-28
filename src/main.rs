@@ -13,46 +13,30 @@ mod heads;
 mod logging;
 mod wlr_client;
 
-use std::fmt::Display;
-
 use clap::Parser;
 use cli::Cli;
 use cli::Commands;
 use functions::position::TargetSetup;
 use heads::Heads;
 
-use log::info;
-
-#[derive(Debug)]
-enum ParameterError {
-    InvalidArgument(String),
-}
-impl Display for ParameterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParameterError::InvalidArgument(msg) => write!(f, "{msg}"),
-        }
-    }
-}
-
-impl std::error::Error for ParameterError {}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(debug_assertions)]
     {
         logging::setup();
     }
-    info!("===Started===");
 
     let args = Cli::parse();
 
     let mut client = wlr_client::Client::new();
     client.connect()?;
-    let configs = client.configurations().unwrap();
+    let configs = client.configurations()?;
     let heads = Heads::new(configs)?;
 
     match args.command {
-        Commands::List {} => functions::list::exec(&heads),
+        Commands::List {} => {
+            functions::list::exec(&heads);
+            Ok(())
+        }
         Commands::Position {
             target,
             relation,
@@ -63,17 +47,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 heads
                     .get(&target)
                     .cloned()
-                    .ok_or(ParameterError::InvalidArgument(String::from(
-                        "target output does not exist",
-                    )))?;
+                    .ok_or("target output does not exist")?;
             let reference_head =
                 heads
                     .get(&reference)
                     .cloned()
-                    .ok_or(ParameterError::InvalidArgument(String::from(
-                        "reference output does not exist",
-                    )))?;
-            functions::position::exec(
+                    .ok_or("reference output does not exist")?;
+            Ok(functions::position::exec(
                 &TargetSetup {
                     target: target_head,
                     reference: reference_head,
@@ -81,10 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     alignment,
                 },
                 &client,
-            );
+            )?)
         }
     }
-
-    info!("===Finished===");
-    Ok(())
 }

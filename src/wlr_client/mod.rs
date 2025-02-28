@@ -8,7 +8,7 @@ use config_writer::{ConfigWriter, UpdateRequest};
 use configs::Configurations;
 
 use std::fmt::{Debug, Display};
-use wayland_client::globals::{registry_queue_init, BindError, GlobalListContents};
+use wayland_client::globals::{registry_queue_init, BindError, GlobalError, GlobalListContents};
 use wayland_client::protocol::wl_registry::{self};
 use wayland_client::{ConnectError, Connection, Dispatch, DispatchError};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
@@ -26,6 +26,15 @@ pub enum ClientError {
     Connection { msg: String },
     Binding { msg: String },
     Dispatch { msg: String },
+}
+
+impl From<GlobalError> for ClientError {
+    fn from(value: GlobalError) -> Self {
+        match value {
+            GlobalError::Backend(err) => ClientError::Connection { msg: err.to_string() },
+            GlobalError::InvalidId(err) => ClientError::Connection { msg: err.to_string() },
+        }
+    }
 }
 
 impl Display for ClientError {
@@ -114,7 +123,7 @@ impl Client {
 
     pub fn connect(&mut self) -> Result<(), ClientError> {
         let conn = Connection::connect_to_env()?;
-        let (globals, mut queue) = registry_queue_init::<Configurations>(&conn).unwrap();
+        let (globals, mut queue) = registry_queue_init::<Configurations>(&conn)?;
         self.wlr_connection = Some(conn);
         log::debug!("queue handle acquired");
 
@@ -129,13 +138,21 @@ impl Client {
         Ok(())
     }
 
-    pub fn configurations(&self) -> Option<&Configurations> {
-        self.configurations.as_ref()
+    pub fn configurations(&self) -> Result<&Configurations, String> {
+        self.configurations.as_ref().ok_or(String::from("failed to acquire current configurations"))
     }
 
-    pub fn update_configurations(&self, update_request: &UpdateRequest) -> bool {
-        let mut config_writer: ConfigWriter =
-            config_writer::ConfigWriter::new(self.wlr_connection.as_ref().unwrap());
-        config_writer.write(update_request, self.output_manager.as_ref().unwrap())
+    pub fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
+        let mut config_writer: ConfigWriter = config_writer::ConfigWriter::new(
+            self.wlr_connection
+                .as_ref()
+                .ok_or("failed to initialize wlr_client")?,
+        );
+        config_writer.write(
+            update_request,
+            self.output_manager
+                .as_ref()
+                .ok_or("failed to initialize wlr_client")?,
+        )
     }
 }

@@ -15,20 +15,18 @@ pub struct TargetSetup<'a> {
     pub alignment: Alignment,
 }
 
-pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) {
+pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) -> Result<(), String> {
     let head_requests: Vec<HeadUpdateRequest> = vec![
         build_target_request(target_setup),
         build_reference_request(target_setup),
     ];
-    let configs = client.configurations().unwrap();
+    let configs = client.configurations()?;
     let request = UpdateRequest {
         serial: configs.serial(),
         head_requests,
     };
     log::info!("position request '{}'", request);
-    if !client.update_configurations(&request) {
-        log::error!("failed to update configs for target output");
-    }
+    client.update_configurations(&request)
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
