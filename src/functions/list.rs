@@ -7,6 +7,7 @@ const GRAY_COLOR: Color = Color::TrueColor {
     b: 88,
 };
 
+#[allow(clippy::print_stdout)]
 pub fn exec(heads: &Heads) {
     for head in heads.heads() {
         if head.enabled() {

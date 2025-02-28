@@ -16,10 +16,6 @@ pub struct TargetSetup<'a> {
 }
 
 pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) {
-    println!(
-        "Put {} {} {} and align them {}",
-        target_setup.target, target_setup.relation, target_setup.reference, target_setup.alignment
-    );
     let head_requests: Vec<HeadUpdateRequest> = vec![
         build_target_request(target_setup),
         build_reference_request(target_setup),

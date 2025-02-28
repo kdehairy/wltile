@@ -7,6 +7,7 @@ use log4rs::{
     Config,
 };
 
+#[cfg(debug_assertions)]
 pub fn setup() {
     let level = std::env::var("RUST_LOG").unwrap_or("INFO".to_string());
     let level = log::LevelFilter::from_str(&level).unwrap_or(log::LevelFilter::Info);
@@ -18,11 +19,7 @@ pub fn setup() {
         .unwrap();
     let config = Config::builder()
         .appender(Appender::builder().build("log_file", Box::new(log_file)))
-        .build(
-            Root::builder()
-                .appender("log_file")
-                .build(level),
-        )
+        .build(Root::builder().appender("log_file").build(level))
         .unwrap();
 
     let _handle = log4rs::init_config(config);
