@@ -3,8 +3,8 @@ use std::fmt::Display;
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
-#[command(name = "wayout")]
-#[command(about = "A wayland tool for wlroot based compositors to configure outputs layout", long_about = None)]
+#[command(name = "wltile")]
+#[command(about = "A tool for wlroot based compositors to configure outputs layout", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,

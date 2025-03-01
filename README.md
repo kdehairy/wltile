@@ -1,10 +1,10 @@
 # Overview
-`wayout` is a cli tool that positions outputs/displays for wlroot based compositors.
+`wltile` is a cli tool that positions outputs/displays for wlroot based compositors.
 
 # Usage Examples
 ## Listing existing displays and their positions
 ```sh
-$ wayout list
+$ wltile list
 DP-2:
         Make: Dell Inc. DELL S3423DWC
         Size: 3440 x 1440
@@ -17,7 +17,7 @@ eDP-1:
 
 ## Positioning DP-2 left of eDP-1 and align them to the bottom
 ```sh
-$ wayout position DP-2 left-of eDP-1 align-bottom
+$ wltile position DP-2 left-of eDP-1 align-bottom
 ```
 
 # Limitations

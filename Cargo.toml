@@ -1,11 +1,11 @@
 [package]
-name = "wayout"
+name = "wltile"
 description = "A cli tool that positions outputs/displays for wlroot based compositors"
 readme = "README.md"
 authors = ["Khaled Eldoheiri <khaled@eldoheiri.com>"]
 version = "0.1.0"
 edition = "2021"
-repository = "https://gitlab.com/eldoheiri/wayout"
+repository = "https://gitlab.com/eldoheiri/wltile"
 license = "GPL-2.0-or-later"
 keywords = ["wayland", "wlroot"]
 categories = ["command-line-utilities"]
