@@ -9,7 +9,6 @@ repository = "https://gitlab.com/eldoheiri/wltile"
 license = "GPL-2.0-or-later"
 keywords = ["wayland", "wlroot"]
 categories = ["command-line-utilities"]
-publish = false # layer
 
 [dependencies]
 clap = { version = "4.5.30", features = ["derive"] }
