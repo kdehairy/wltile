@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Show the scaling factor when listing outputs
 
 ## [v0.1.1-alpha.2]
 ### Added

@@ -31,7 +31,7 @@ pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) -> Result<(
 
 #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
 fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<'a> {
-    let (target_size, reference_size) = unscaled_sizes(target_setup);
+    let (target_size, reference_size) = scaled_sizes(target_setup);
     let mut position = match target_setup.relation {
         Relation::RightOf => Point(0, 0),
         Relation::LeftOf => target_size,
@@ -58,7 +58,7 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
 }
 
 fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<'a> {
-    let (target_size, reference_size) = unscaled_sizes(target_setup);
+    let (target_size, reference_size) = scaled_sizes(target_setup);
     let mut position = match target_setup.relation {
         Relation::RightOf => reference_size,
         Relation::LeftOf => Point(0, 0),
@@ -84,7 +84,7 @@ fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
-fn unscaled_sizes(target_setup: &TargetSetup) -> (Point, Point) {
+fn scaled_sizes(target_setup: &TargetSetup) -> (Point, Point) {
     let target_h = f64::from(target_setup.target.mode().size().1) / target_setup.target.scale();
     let target_h = target_h.round() as i32;
 
