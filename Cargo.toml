@@ -7,7 +7,7 @@ version = "0.1.1-alpha.2"
 edition = "2021"
 repository = "https://gitlab.com/eldoheiri/wltile"
 license = "GPL-2.0-or-later"
-keywords = ["wayland", "wlroot"]
+keywords = ["wayland", "wlroots"]
 categories = ["command-line-utilities"]
 
 [dependencies]
