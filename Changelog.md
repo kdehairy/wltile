@@ -1,8 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+## [v0.1.1]
 ### Added
 - Show the scaling factor when listing outputs
+- Show the refresh rate when listing outputs
 
 ## [v0.1.1-alpha.2]
 ### Added
