@@ -1,6 +1,6 @@
 [package]
 name = "wltile"
-description = "A cli tool that positions outputs/displays for wlroot based compositors"
+description = "A cli tool that positions outputs/displays for wlroots based compositors"
 readme = "README.md"
 authors = ["Khaled Eldoheiri <khaled@eldoheiri.com>"]
 version = "0.1.1"
