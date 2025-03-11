@@ -21,6 +21,7 @@ pub fn exec(heads: &Heads) {
             println!("{}:", head.name().bold());
             print_make(head);
             print_size(head);
+            print_physical_size(head);
             print_refresh(head);
             print_position(head);
         }
@@ -28,8 +29,20 @@ pub fn exec(heads: &Heads) {
 }
 
 #[allow(clippy::print_stdout)]
+fn print_physical_size(head: &Head) {
+    println!(
+        "\tPhysical Size: {} x {}",
+        head.physical_size().0,
+        head.physical_size().1,
+    );
+}
+
+#[allow(clippy::print_stdout)]
 fn print_refresh(head: &Head) {
-    println!("\tRefresh Rate: {} kHz", f64::from(head.mode().refresh()).div(1000_f64).round());
+    println!(
+        "\tRefresh Rate: {} kHz",
+        f64::from(head.mode().refresh()).div(1000_f64).round()
+    );
 }
 
 #[allow(clippy::print_stdout)]
@@ -39,13 +52,12 @@ fn print_make(head: &Head) {
 
 #[allow(clippy::print_stdout)]
 fn print_size(head: &Head) {
-    print!(
-        "\tSize: {} x {}",
+    println!(
+        "\tSize: {} x {} {}",
         head.mode().size().0,
         head.mode().size().1,
+        format!("scale: {}", head.scale()).color(LIGHT_GRAY_COLOR),
     );
-    let scale = format!(" scale: {}", head.scale()).color(LIGHT_GRAY_COLOR);
-    println!("{scale}");
 }
 
 #[allow(clippy::print_stdout)]

@@ -79,6 +79,10 @@ impl<'a> Head<'a> {
         self.output_head.position()
     }
 
+    pub fn physical_size(&self) -> &Point {
+        self.output_head.physical_size()
+    }
+
     pub fn output_head(&self) -> &OutputHead {
         self.output_head
     }

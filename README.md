@@ -50,12 +50,6 @@ Example:
 $ wltile position DP-2 left-of eDP-1 align-bottom
 ```
 
-# Limitations
-This tool is still under developement.
-
-That said, my aim is to do a first release that:
-- lists all displays along with relevant info for positioning them.
-- position two displays relative to each other either left or right.
-- while positioning the displays, align them to bottom or top.
-
-Currently it does all of that, but not properly handling failures.
+# Roadmap
+- Change display mode (resolution and refresh rate)
+- Interactive CLI mode

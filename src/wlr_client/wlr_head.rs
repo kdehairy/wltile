@@ -149,7 +149,7 @@ impl OutputHead {
         &self.description
     }
 
-    pub fn _physical_size(&self) -> &Point {
+    pub fn physical_size(&self) -> &Point {
         &self.physical_size
     }
 
