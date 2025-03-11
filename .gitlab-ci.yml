@@ -1,5 +1,12 @@
 stages:
+  - verify
   - build
+
+clippy:
+  stage: verify
+  image: rust:latest
+  script:
+    - cargo clippy
 
 rust-latest:
   stage: build
