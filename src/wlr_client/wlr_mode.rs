@@ -61,7 +61,7 @@ impl OutputMode {
         &self.size
     }
 
-    pub fn _refresh(&self) -> i32 {
+    pub fn refresh(&self) -> i32 {
         self.refresh
     }
 

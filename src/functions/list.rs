@@ -1,4 +1,6 @@
-use crate::heads::Heads;
+use std::ops::Div;
+
+use crate::heads::{Head, Heads};
 use colored::{Color, Colorize};
 
 const GRAY_COLOR: Color = Color::TrueColor {
@@ -17,15 +19,36 @@ pub fn exec(heads: &Heads) {
     for head in heads.heads() {
         if head.enabled() {
             println!("{}:", head.name().bold());
-            println!("\tMake: {} {}", head.make(), head.model().color(GRAY_COLOR));
-            print!(
-                "\tSize: {} x {}",
-                head.mode().size().0,
-                head.mode().size().1,
-            );
-            let scale = format!(" scale: {}", head.scale()).color(LIGHT_GRAY_COLOR);
-            println!("{scale}");
-            println!("\tPosition: {}", head.position());
+            print_make(head);
+            print_size(head);
+            print_refresh(head);
+            print_position(head);
         }
     }
+}
+
+#[allow(clippy::print_stdout)]
+fn print_refresh(head: &Head) {
+    println!("\tRefresh Rate: {} kHz", f64::from(head.mode().refresh()).div(1000_f64).round());
+}
+
+#[allow(clippy::print_stdout)]
+fn print_make(head: &Head) {
+    println!("\tMake: {} {}", head.make(), head.model().color(GRAY_COLOR));
+}
+
+#[allow(clippy::print_stdout)]
+fn print_size(head: &Head) {
+    print!(
+        "\tSize: {} x {}",
+        head.mode().size().0,
+        head.mode().size().1,
+    );
+    let scale = format!(" scale: {}", head.scale()).color(LIGHT_GRAY_COLOR);
+    println!("{scale}");
+}
+
+#[allow(clippy::print_stdout)]
+fn print_position(head: &Head) {
+    println!("\tPosition: {}", head.position());
 }
