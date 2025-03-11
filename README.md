@@ -51,5 +51,6 @@ $ wltile position DP-2 left-of eDP-1 align-bottom
 ```
 
 # Roadmap
-- Change display mode (resolution and refresh rate)
+- Change output mode (resolution and refresh rate).
+- Change output orientation.
 - Interactive CLI mode

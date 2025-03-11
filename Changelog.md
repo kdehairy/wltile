@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Added
 - Show physical size when listing outputs.
+- Added a GPLv3 license file.
 
 ## [v0.1.1]
 ### Added
