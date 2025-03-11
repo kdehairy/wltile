@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Show physical size when listing outputs.
+
 ## [v0.1.1]
 ### Added
 - Show the scaling factor when listing outputs
