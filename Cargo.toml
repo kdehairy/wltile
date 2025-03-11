@@ -1,12 +1,13 @@
 [package]
 name = "wltile"
+version = "0.1.1"
+authors = ["Khaled Eldoheiri <khaled@eldoheiri.com>"]
+edition = "2021"
 description = "A cli tool that positions outputs/displays for wlroots based compositors"
 readme = "README.md"
-authors = ["Khaled Eldoheiri <khaled@eldoheiri.com>"]
-version = "0.1.1"
-edition = "2021"
 repository = "https://gitlab.com/eldoheiri/wltile"
-license = "GPL-2.0-or-later"
+license = "GPL-3.0-or-later"
+license-file = "LICENSE"
 keywords = ["wayland", "wlroots"]
 categories = ["command-line-utilities"]
 
