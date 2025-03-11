@@ -65,7 +65,7 @@ pub struct HeadUpdateRequest<'a> {
     pub position: Option<Point>,
 }
 
-impl<'a> Display for HeadUpdateRequest<'a> {
+impl Display for HeadUpdateRequest<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -82,7 +82,7 @@ pub struct UpdateRequest<'a> {
     pub head_requests: Vec<HeadUpdateRequest<'a>>,
 }
 
-impl<'a> Display for UpdateRequest<'a> {
+impl Display for UpdateRequest<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,

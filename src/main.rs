@@ -4,7 +4,8 @@
     clippy::print_stdout,
     clippy::arithmetic_side_effects,
     clippy::as_conversions,
-    clippy::integer_division
+    clippy::integer_division,
+    clippy::needless_lifetimes,
 )]
 
 mod cli;

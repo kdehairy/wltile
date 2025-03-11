@@ -54,7 +54,7 @@ pub struct Head<'a> {
     current_mode: &'a OutputMode,
 }
 
-impl<'a> Head<'a> {
+impl Head<'_> {
     pub fn mode(&self) -> &OutputMode {
         self.current_mode
     }
@@ -92,7 +92,7 @@ impl<'a> Head<'a> {
     }
 }
 
-impl<'a> Display for Head<'a> {
+impl Display for Head<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let head = self.output_head;
         write!(
