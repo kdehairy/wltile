@@ -13,4 +13,5 @@
 - while positioning the displays, align them to bottom or top.
 
 [unreleased]: https://gitlab.com/eldoheiri/wltile/-/commits/main?ref_type=heads
+[v0.1.1]: https://gitlab.com/eldoheiri/wltile/-/tree/v0.1.1?ref_type=tags
 [v0.1.1-alpha.2]: https://gitlab.com/eldoheiri/wltile/-/tree/v0.1.1-alpha.2?ref_type=tags
