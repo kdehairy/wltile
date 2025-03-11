@@ -5,8 +5,11 @@ stages:
 clippy:
   stage: verify
   image: rust:latest
+  variables:
+    RUSTFLAGS: "-Dwarnings"
   script:
-    - cargo clippy
+    - rustup component add clippy
+    - cargo clippy --all-targets --all-features
 
 rust-latest:
   stage: build
