@@ -19,4 +19,4 @@
 
 [unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.1.1...main
 [v0.1.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.1.1-alpha.1...v0.1.1
-[v0.1.1-alpha.2]: https://gitlab.com/eldoheiri/wltile/-/tree/v0.1.1-alpha.2?ref_type=tags
+[v0.1.1-alpha.2]: https://gitlab.com/eldoheiri/wltile/-/commits/v0.1.1-alpha.2?ref_type=tags

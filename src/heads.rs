@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use wayland_client::backend::ObjectId;
+use wayland_client::protocol::wl_output::Transform;
 
 use crate::wlr_client::wlr_mode::OutputMode;
 
@@ -95,6 +96,10 @@ impl Head<'_> {
 
     pub fn scale(&self) -> f64 {
         self.output_head.scale()
+    }
+
+    pub fn transform(&self) -> Transform {
+        self.output_head.transform()
     }
 }
 

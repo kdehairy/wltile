@@ -1,13 +1,11 @@
 use std::fmt::Display;
 
 use wayland_client::backend::ObjectId;
-use wayland_client::Proxy;
+use wayland_client::protocol::wl_output::Transform;
 use wayland_client::{event_created_child, Dispatch};
+use wayland_client::{Proxy, WEnum};
 use wayland_protocols_wlr::output_management::v1::client::{
-    zwlr_output_head_v1::{
-        Event,
-        ZwlrOutputHeadV1, EVT_MODE_OPCODE,
-    },
+    zwlr_output_head_v1::{Event, ZwlrOutputHeadV1, EVT_MODE_OPCODE},
     zwlr_output_manager_v1::ZwlrOutputManagerV1,
     zwlr_output_mode_v1::ZwlrOutputModeV1,
 };
@@ -30,11 +28,11 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
                 Event::Name { name } => {
                     log::debug!("Head {}: name={}", head.id(), name);
                     head.name = name;
-                },
+                }
                 Event::Description { description } => {
                     log::trace!("Head {}: description={}", head.id(), description);
                     head.description = description;
-                },
+                }
                 Event::PhysicalSize { width, height } => head.physical_size = Point(width, height),
                 Event::Mode { mode } => {
                     log::trace!("Head {}: mode={}", head.id(), mode.id());
@@ -45,28 +43,35 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
                 Event::CurrentMode { mode } => {
                     log::debug!("Head {}: current_mode={}", head.id(), mode.id());
                     head.current_mode_id = mode.id();
-                },
+                }
                 Event::Position { x, y } => {
                     log::debug!("Head {}: position={}", head.id(), Point(x, y));
                     head.position = Point(x, y);
-                },
+                }
                 Event::Finished => {
                     kill_me_please = true;
                 }
                 Event::Make { make } => {
                     log::trace!("Head {}: make={}", head.id(), make);
                     head.make = make;
-                },
+                }
                 Event::Model { model } => {
                     log::trace!("Head {}: model={}", head.id(), model);
                     head.model = model;
-                },
+                }
                 Event::SerialNumber { serial_number } => head.serial_number = serial_number,
                 Event::Scale { scale } => {
                     log::trace!("Head {}: scale={}", head.id(), scale);
                     head.scale = scale;
-                },
-                //Event::AdaptiveSync { state: _ } | Event::Transform { transform: _ } => {},
+                }
+                #[allow(clippy::as_conversions)]
+                Event::Transform {
+                    transform: WEnum::Value(transform),
+                } => {
+                    log::trace!("Head {}: trasform={}", head.id(), transform as u8);
+                    head.transform = transform;
+                }
+                //Event::AdaptiveSync { state: _ },
                 _ => {}
             }
         }
@@ -82,7 +87,6 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
         EVT_MODE_OPCODE => (ZwlrOutputModeV1, ()),
     ]);
 }
-
 
 #[derive(Debug)]
 pub struct OutputHead {
@@ -100,6 +104,7 @@ pub struct OutputHead {
     model: String,
     serial_number: String,
     scale: f64,
+    transform: Transform,
 }
 
 impl OutputHead {
@@ -118,6 +123,7 @@ impl OutputHead {
             model: String::default(),
             serial_number: String::default(),
             scale: f64::default(),
+            transform: Transform::Normal,
         }
     }
 
@@ -179,6 +185,10 @@ impl OutputHead {
 
     pub fn scale(&self) -> f64 {
         self.scale
+    }
+
+    pub fn transform(&self) -> Transform {
+        self.transform
     }
 }
 

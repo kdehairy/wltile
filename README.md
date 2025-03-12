@@ -38,6 +38,7 @@ Make: Lenovo Group Limited
 Model: 0x414B
 Size: 2880 x 1800
 Scale: 2
+Transform: 0
 Physical Size: 300 x 190 mm
 Refresh Rate: 120 kHz
 Position: (3440, 540)
