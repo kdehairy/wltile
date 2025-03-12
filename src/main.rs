@@ -5,7 +5,7 @@
     clippy::arithmetic_side_effects,
     clippy::as_conversions,
     clippy::integer_division,
-    clippy::needless_lifetimes,
+    clippy::needless_lifetimes
 )]
 
 mod cli;
@@ -38,11 +38,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             functions::list::exec(&heads);
             Ok(())
         }
-        Commands::Show { output} => {
-            let head = heads.get(&output)
-                .cloned()
-                .ok_or("output does not exist")?;
-            Ok(functions::show::exec(head, configs)?)
+        Commands::Show { output } => {
+            let head = heads.get(&output).ok_or("output does not exist")?;
+            functions::show::exec(head, configs);
+            Ok(())
         }
         Commands::Position {
             target,
@@ -50,16 +49,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             reference,
             alignment,
         } => {
-            let target_head =
-                heads
-                    .get(&target)
-                    .cloned()
-                    .ok_or("target output does not exist")?;
-            let reference_head =
-                heads
-                    .get(&reference)
-                    .cloned()
-                    .ok_or("reference output does not exist")?;
+            let target_head = heads
+                .get(&target)
+                .cloned()
+                .ok_or("target output does not exist")?;
+            let reference_head = heads
+                .get(&reference)
+                .cloned()
+                .ok_or("reference output does not exist")?;
             Ok(functions::position::exec(
                 &TargetSetup {
                     target: target_head,

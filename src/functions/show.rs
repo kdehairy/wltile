@@ -3,16 +3,16 @@ use std::ops::Div;
 use crate::{heads::Head, wlr_client::{configs::Configurations, wlr_mode::OutputMode}};
 
 
-pub(crate) fn exec(head: Head, configs: &Configurations) -> Result<(), String> {
+pub(crate) fn exec(head: &Head, configs: &Configurations) {
     print_make(&head);
     print_size(&head);
     print_physical_size(&head);
     print_refresh(&head);
     print_position(&head);
     print_modes(&head, configs);
-    Ok(())
 }
 
+#[allow(clippy::print_stdout)]
 fn print_modes(head: &Head, configs: &Configurations) {
     println!("Modes:");
     for id in head.mode_ids() {
@@ -21,8 +21,9 @@ fn print_modes(head: &Head, configs: &Configurations) {
     }
 }
 
+#[allow(clippy::print_stdout)]
 fn print_mode(mode: &OutputMode) {
-    let prefered = if mode._prefered() {
+    let prefered = if mode.prefered() {
         "\t>"
     } else {
         "\t "

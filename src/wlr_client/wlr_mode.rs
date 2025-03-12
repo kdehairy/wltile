@@ -65,7 +65,7 @@ impl OutputMode {
         self.refresh
     }
 
-    pub fn _prefered(&self) -> bool {
+    pub fn prefered(&self) -> bool {
         self.prefered
     }
 }
