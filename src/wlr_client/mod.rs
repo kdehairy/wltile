@@ -3,14 +3,16 @@ pub mod configs;
 mod output_manager;
 pub mod wlr_head;
 pub mod wlr_mode;
+pub mod errors;
 
 use config_writer::{ConfigWriter, UpdateRequest};
 use configs::Configurations;
+use errors::ClientError;
 
 use std::fmt::{Debug, Display};
-use wayland_client::globals::{registry_queue_init, BindError, GlobalError, GlobalListContents};
+use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::wl_registry::{self};
-use wayland_client::{ConnectError, Connection, Dispatch, DispatchError};
+use wayland_client::{Connection, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
 #[derive(Debug, Default, PartialEq, Clone, Copy)]
@@ -20,79 +22,6 @@ impl Display for Point {
         write!(f, "({}, {})", self.0, self.1)
     }
 }
-
-#[derive(Debug)]
-pub enum ClientError {
-    Connection { msg: String },
-    Binding { msg: String },
-    Dispatch { msg: String },
-}
-
-impl From<GlobalError> for ClientError {
-    fn from(value: GlobalError) -> Self {
-        match value {
-            GlobalError::Backend(err) => ClientError::Connection { msg: err.to_string() },
-            GlobalError::InvalidId(err) => ClientError::Connection { msg: err.to_string() },
-        }
-    }
-}
-
-impl Display for ClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ClientError::Connection { msg } => {
-                write!(f, "failed to connect to wayland server: {msg}")
-            }
-            ClientError::Binding { msg } => {
-                write!(f, "failed to bind to wayland object: {msg}")
-            }
-            ClientError::Dispatch { msg } => {
-                write!(f, "failed to dispatch message: {msg}")
-            }
-        }
-    }
-}
-
-impl From<ConnectError> for ClientError {
-    fn from(value: ConnectError) -> Self {
-        match value {
-            ConnectError::NoWaylandLib | ConnectError::InvalidFd | ConnectError::NoCompositor => {
-                ClientError::Connection {
-                    msg: format!("{value}"),
-                }
-            }
-        }
-    }
-}
-
-impl From<BindError> for ClientError {
-    fn from(value: BindError) -> Self {
-        match value {
-            BindError::UnsupportedVersion | BindError::NotPresent => ClientError::Binding {
-                msg: format!("{value}"),
-            },
-        }
-    }
-}
-
-impl From<DispatchError> for ClientError {
-    fn from(value: DispatchError) -> Self {
-        match value {
-            DispatchError::BadMessage {
-                sender_id: ref _i,
-                interface: _,
-                opcode: _,
-            } => ClientError::Dispatch {
-                msg: format!("{value}"),
-            },
-            DispatchError::Backend(ref _i) => ClientError::Dispatch {
-                msg: format!("{value}"),
-            },
-        }
-    }
-}
-
-impl std::error::Error for ClientError {}
 
 impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Configurations {
     fn event(
