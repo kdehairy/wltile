@@ -15,6 +15,13 @@ pub enum Commands {
     #[command(about = "Lists all connected outputs")]
     List,
 
+    #[command(about = "Shows detailed info for the specified output")]
+    #[command(arg_required_else_help = true)]
+    Show {
+        #[arg(value_name="OUTPUT")]
+        output: String,
+    },
+
     #[command(about = "Position outputs")]
     #[command(arg_required_else_help = true)]
     Position {

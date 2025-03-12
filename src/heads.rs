@@ -2,6 +2,8 @@ use std::collections::hash_map::Values;
 use std::collections::HashMap;
 use std::fmt::Display;
 
+use wayland_client::backend::ObjectId;
+
 use crate::wlr_client::wlr_mode::OutputMode;
 
 use super::wlr_client::configs::Configurations;
@@ -85,6 +87,10 @@ impl Head<'_> {
 
     pub fn output_head(&self) -> &OutputHead {
         self.output_head
+    }
+
+    pub fn mode_ids(&self) -> &Vec<ObjectId> {
+        self.output_head.mode_ids()
     }
 
     pub fn scale(&self) -> f64 {

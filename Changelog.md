@@ -4,6 +4,7 @@
 ### Added
 - Show physical size when listing outputs.
 - Added a GPLv3 license file.
+- Add a command "Show <OUTPUT>" to show more details for the specified output.
 
 ## [v0.1.1]
 ### Added

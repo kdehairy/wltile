@@ -38,6 +38,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             functions::list::exec(&heads);
             Ok(())
         }
+        Commands::Show { output} => {
+            let head = heads.get(&output)
+                .cloned()
+                .ok_or("output does not exist")?;
+            Ok(functions::show::exec(head, configs)?)
+        }
         Commands::Position {
             target,
             relation,

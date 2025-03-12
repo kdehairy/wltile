@@ -31,7 +31,7 @@ pub fn exec(heads: &Heads) {
 #[allow(clippy::print_stdout)]
 fn print_physical_size(head: &Head) {
     println!(
-        "\tPhysical Size: {} x {}",
+        "\tPhysical Size: {} x {} mm",
         head.physical_size().0,
         head.physical_size().1,
     );
