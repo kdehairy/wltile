@@ -4,12 +4,12 @@ use crate::{heads::Head, wlr_client::{configs::Configurations, wlr_mode::OutputM
 
 
 pub(crate) fn exec(head: &Head, configs: &Configurations) {
-    print_make(&head);
-    print_size(&head);
-    print_physical_size(&head);
-    print_refresh(&head);
-    print_position(&head);
-    print_modes(&head, configs);
+    print_make(head);
+    print_size(head);
+    print_physical_size(head);
+    print_refresh(head);
+    print_position(head);
+    print_modes(head, configs);
 }
 
 #[allow(clippy::print_stdout)]
