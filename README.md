@@ -1,5 +1,5 @@
 # Overview
-`wltile` is a cli tool that positions outputs/displays for wlroot based compositors.
+`wltile` is a cli tool that positions outputs/displays for wlroots based compositors.
 
 
 # Usage
