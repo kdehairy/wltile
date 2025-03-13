@@ -54,6 +54,7 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
     HeadUpdateRequest {
         head: target_setup.reference.output_head(),
         position: Some(position),
+        mode: None,
     }
 }
 
@@ -80,6 +81,7 @@ fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<
     HeadUpdateRequest {
         head: target_setup.target.output_head(),
         position: Some(position),
+        mode: None,
     }
 }
 

@@ -18,7 +18,7 @@ pub enum Commands {
     #[command(about = "Shows detailed info for the specified output")]
     #[command(arg_required_else_help = true)]
     Show {
-        #[arg(value_name="OUTPUT")]
+        #[arg(value_name = "OUTPUT")]
         output: String,
     },
 
@@ -26,21 +26,37 @@ pub enum Commands {
     #[command(arg_required_else_help = true)]
     Position {
         /// Output to be positioned
-        #[arg(value_name="TARGET_OUTPUT")]
+        #[arg(value_name = "TARGET_OUTPUT")]
         target: String,
 
         /// How is it positioned to the reference output
-        #[arg(value_name="RELATION")]
-        relation: Relation, 
+        #[arg(value_name = "RELATION")]
+        relation: Relation,
 
         /// Reference Output
-        #[arg(value_name="REFERENCE_OUTPUT")]
+        #[arg(value_name = "REFERENCE_OUTPUT")]
         reference: String,
 
         /// Alignment
         #[arg(value_name="ALIGNMENT", default_value_t= Alignment::AlignBottom)]
         alignment: Alignment,
     },
+    #[command(about = "Sets properties of the output to a desired value", arg_required_else_help = true)]
+    Set {
+        #[arg(value_name = "TARGET_OUTPUT")]
+        target: String,
+
+        #[arg(value_name="PROPERTY")]
+        property: Property,
+
+        #[arg(value_name="VALUE")]
+        value: String,
+    },
+}
+
+#[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
+pub enum Property {
+    Mode,
 }
 
 #[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]

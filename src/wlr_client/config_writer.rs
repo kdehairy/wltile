@@ -3,6 +3,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
+use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::ZwlrOutputModeV1;
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_configuration_head_v1::ZwlrOutputConfigurationHeadV1,
     zwlr_output_configuration_v1::{Event, ZwlrOutputConfigurationV1},
@@ -63,6 +64,7 @@ impl Dispatch<ZwlrOutputConfigurationHeadV1, ()> for State {
 pub struct HeadUpdateRequest<'a> {
     pub head: &'a OutputHead,
     pub position: Option<Point>,
+    pub mode: Option<&'a ZwlrOutputModeV1>,
 }
 
 impl Display for HeadUpdateRequest<'_> {

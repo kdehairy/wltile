@@ -2,8 +2,10 @@ use std::ops::Div;
 
 use wayland_client::protocol::wl_output::Transform;
 
-use crate::{heads::Head, wlr_client::{configs::Configurations, wlr_mode::OutputMode}};
-
+use crate::{
+    heads::Head,
+    wlr_client::{configs::Configurations, wlr_mode::OutputMode},
+};
 
 pub(crate) fn exec(head: &Head, configs: &Configurations) {
     print_make(head);
@@ -37,20 +39,28 @@ fn display_transform(value: Transform) -> String {
 #[allow(clippy::print_stdout)]
 fn print_modes(head: &Head, configs: &Configurations) {
     println!("Modes:");
-    for id in head.mode_ids() {
-        let mode = configs.get_mode(id).expect("Something went wrong with mode configurations");
-        print_mode(mode);
+    let mut modes: Vec<&OutputMode> = head
+        .mode_ids()
+        .iter()
+        .map(|id| configs.get_mode(id).expect("Unexpected failure"))
+        .collect();
+    modes.sort_by(|a, b| b.cmp(a));
+    for (i, mode) in modes.iter().enumerate() {
+        print_mode(mode, i);
     }
 }
 
 #[allow(clippy::print_stdout)]
-fn print_mode(mode: &OutputMode) {
-    let prefered = if mode.prefered() {
-        "\t>"
-    } else {
-        "\t "
-    };
-    println!("{} {} x {} @ {} kHz", prefered, mode.size().0, mode.size().1, f64::from(mode.refresh()).div(1000_f64).round());
+fn print_mode(mode: &OutputMode, index: usize) {
+    let prefered = if mode.prefered() { "\t>" } else { "\t " };
+    println!(
+        "{} {}. {} x {} @ {} kHz",
+        prefered,
+        index,
+        mode.size().0,
+        mode.size().1,
+        f64::from(mode.refresh()).div(1000_f64).round()
+    );
 }
 
 #[allow(clippy::print_stdout)]
@@ -78,11 +88,7 @@ fn print_make(head: &Head) {
 
 #[allow(clippy::print_stdout)]
 fn print_size(head: &Head) {
-    println!(
-        "Size: {} x {}",
-        head.mode().size().0,
-        head.mode().size().1,
-    );
+    println!("Size: {} x {}", head.mode().size().0, head.mode().size().1,);
     println!("Scale: {}", head.scale());
 }
 
