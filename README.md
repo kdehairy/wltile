@@ -58,9 +58,12 @@ Modes:
           11. 800 x 600 @ 120 kHz
           12. 640 x 480 @ 120 kHz
 ```
-Modes format is as following: `<ordinal> <resolution> @ <refresh rate> <prefered mode>`. The 
-`<ordinal>` is used later to refer to the mode in other operations (for
+Modes format is as following: `<ordinal> <resolution> @ <refresh rate> <prefered mode>`. 
+The `<ordinal>` is used later to refer to the mode in other operations (for
 example to set the mode to a desired one).
+
+Modes are always shown ordered from the highest resolution and referesh rate, 
+to the lowest. This makes the ordinals stable between runs.
 
 ## Position
 ```
