@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::heads::{Head, Heads};
+
 use super::wlr_head::OutputHead;
 use super::wlr_mode::OutputMode;
 use wayland_client::{backend::ObjectId, Proxy};
@@ -15,6 +17,30 @@ pub struct Configurations {
 }
 
 impl Configurations {
+    pub fn heads(&self) -> Result<Heads, String> {
+        let mut heads = Heads::default();
+        for output_head in self.output_heads() {
+            let head = Head {
+                output_head,
+                current_mode: {
+                    if let Some(mode) = self.find_current_mode(output_head) {
+                        mode
+                    } else {
+                        return Err(String::from("failed to find current mode"));
+                    }
+                },
+            };
+            heads.insert(output_head.name().to_string(), head);
+        }
+        Ok(heads)
+    }
+
+    fn find_current_mode(&self, wlr_head: &OutputHead) -> Option<&OutputMode> {
+        wlr_head.mode_ids().iter()
+            .find(|&id| id == wlr_head.current_mode_id())
+            .map(|id| self.get_mode(id))?
+    }
+
     pub fn add_head(&mut self, head: ZwlrOutputHeadV1) {
         self.heads.insert(head.id(), OutputHead::new(head));
     }
@@ -43,7 +69,7 @@ impl Configurations {
         self.modes.get(id)
     }
 
-    pub fn heads(&self) -> Vec<&OutputHead> {
+    pub fn output_heads(&self) -> Vec<&OutputHead> {
         self.heads.values().collect()
     }
 

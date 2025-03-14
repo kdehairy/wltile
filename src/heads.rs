@@ -7,39 +7,17 @@ use wayland_client::protocol::wl_output::Transform;
 
 use crate::wlr_client::wlr_mode::OutputMode;
 
-use super::wlr_client::configs::Configurations;
 use super::wlr_client::wlr_head::OutputHead;
 use super::wlr_client::Point;
 
+#[derive(Default)]
 pub struct Heads<'a> {
     heads: HashMap<String, Head<'a>>,
 }
 
 impl<'a> Heads<'a> {
-    pub fn new(configs: &'a Configurations) -> Result<Self, String> {
-        let mut heads = Self {
-            heads: HashMap::default(),
-        };
-        for output_head in configs.heads() {
-            let head = Head {
-                output_head,
-                current_mode: {
-                    if let Some(mode) = Self::find_current_mode(output_head, configs) {
-                        mode
-                    } else {
-                        return Err(String::from("failed to find current mode"));
-                    }
-                },
-            };
-            heads.heads.insert(output_head.name().to_string(), head);
-        }
-        Ok(heads)
-    }
-
-    fn find_current_mode(wlr_head: &'a OutputHead, configs: &'a Configurations) -> Option<&'a OutputMode> {
-        wlr_head.mode_ids().iter()
-            .find(|&id| id == wlr_head.current_mode_id())
-            .map(|id| configs.get_mode(id))?
+    pub fn insert(&mut self, name: String, head: Head<'a>) {
+        self.heads.insert(name, head);
     }
 
     pub fn heads(&self) -> Values<'_, String, Head> {
@@ -53,8 +31,8 @@ impl<'a> Heads<'a> {
 
 #[derive(Clone)]
 pub struct Head<'a> {
-    output_head: &'a OutputHead,
-    current_mode: &'a OutputMode,
+    pub output_head: &'a OutputHead,
+    pub current_mode: &'a OutputMode,
 }
 
 impl Head<'_> {

@@ -18,7 +18,6 @@ use clap::Parser;
 use cli::Cli;
 use cli::Commands;
 use functions::position::TargetSetup;
-use heads::Heads;
 use wlr_client::wlr_mode::OutputMode;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = wlr_client::Client::new();
     client.connect()?;
     let configs = client.configurations()?;
-    let heads = Heads::new(configs)?;
+    let heads = configs.heads()?;
 
     match args.command {
         Commands::List {} => {
