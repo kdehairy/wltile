@@ -45,7 +45,7 @@ impl Configurations {
         self.heads.insert(head.id(), OutputHead::new(head));
     }
 
-    pub fn add_mode(&mut self, mode: &ZwlrOutputModeV1) {
+    pub fn add_mode(&mut self, mode: ZwlrOutputModeV1) {
         self.modes.insert(mode.id(), OutputMode::new(mode));
     }
 

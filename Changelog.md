@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Add a command "Set <PROPERTY> <VALUE>" to change output properties.
+- Implement changing the "mode" property for an output.
+
 ## [v0.2.0]
 ### Added
 - Show physical size when listing outputs.

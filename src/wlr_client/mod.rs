@@ -25,16 +25,14 @@ impl Display for Point {
 
 impl PartialOrd for Point {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let me = self.0.pow(2) + self.1.pow(2);
-        let other = other.0.pow(2) + other.1.pow(2);
-        me.partial_cmp(&other)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Point {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let me = self.0.pow(2) + self.1.pow(2);
-        let other = other.0.pow(2) + other.1.pow(2);
+        let me = self.0.pow(2).saturating_add(self.1.pow(2));
+        let other = other.0.pow(2).saturating_add(other.1.pow(2));
         me.cmp(&other)
     }
 }

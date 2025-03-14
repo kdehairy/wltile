@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
+use wayland_client::Proxy;
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::ZwlrOutputModeV1;
 use wayland_protocols_wlr::output_management::v1::client::{
@@ -165,6 +166,7 @@ impl ConfigWriter {
         head: &OutputHead,
         request: &HeadUpdateRequest,
     ) -> bool {
+        let mut dirty = false;
         if let Some(position) = request.position.as_ref() {
             if head.position() != position {
                 log::debug!(
@@ -173,9 +175,21 @@ impl ConfigWriter {
                     position
                 );
                 head_configuration.set_position(position.0, position.1);
-                return true;
+                dirty = true;
             }
         }
-        false
+
+        if let Some(mode) = request.mode {
+            if *head.current_mode_id() != mode.id() {
+                log::debug!(
+                    "Changes in mode detected for head '{}' to {:?}",
+                    head.name(),
+                    mode
+                );
+                head_configuration.set_mode(mode);
+                dirty = true;
+            }
+        }
+        dirty
     }
 }

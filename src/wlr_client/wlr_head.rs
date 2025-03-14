@@ -37,7 +37,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
                 Event::Mode { mode } => {
                     log::trace!("Head {}: mode={}", head.id(), mode.id());
                     head.add_mode(&mode);
-                    state.add_mode(&mode);
+                    state.add_mode(mode);
                 }
                 Event::Enabled { enabled } => head.enabled = !matches!(enabled, 0),
                 Event::CurrentMode { mode } => {

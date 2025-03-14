@@ -37,17 +37,17 @@ impl Dispatch<ZwlrOutputModeV1, ()> for Configurations {
 #[derive(Eq)]
 pub struct OutputMode {
     wl_id: ObjectId,
-    //wlr_mode: ZwlrOutputModeV1,
+    wlr_mode: ZwlrOutputModeV1,
     size: Point,
     refresh: i32,
     prefered: bool,
 }
 
 impl OutputMode {
-    pub fn new(mode: &ZwlrOutputModeV1) -> Self {
+    pub fn new(mode: ZwlrOutputModeV1) -> Self {
         Self {
             wl_id: mode.id(),
-            //wlr_mode: mode,
+            wlr_mode: mode,
             size: Point::default(),
             refresh: 0,
             prefered: bool::default(),
@@ -68,6 +68,10 @@ impl OutputMode {
 
     pub fn prefered(&self) -> bool {
         self.prefered
+    }
+
+    pub fn wl_mode(&self) -> &ZwlrOutputModeV1 {
+        &self.wlr_mode
     }
 }
 
@@ -99,10 +103,6 @@ impl Ord for OutputMode {
 
 impl PartialOrd for OutputMode {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.size.partial_cmp(&other.size) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.refresh.partial_cmp(&other.refresh)
+        Some(self.cmp(other))
     }
 }
