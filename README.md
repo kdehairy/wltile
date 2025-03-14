@@ -44,7 +44,7 @@ Physical Size: 300 x 190 mm
 Refresh Rate: 120 kHz
 Position: (0, 0)
 Modes:
-        > 0. 2880 x 1800 @ 120 kHz
+        > 0. 2880 x 1800 @ 120 kHz (*)
           1. 2880 x 1800 @ 60 kHz
           2. 1920 x 1200 @ 120 kHz
           3. 1920 x 1080 @ 120 kHz
@@ -58,7 +58,7 @@ Modes:
           11. 800 x 600 @ 120 kHz
           12. 640 x 480 @ 120 kHz
 ```
-Modes format is as following: `<ordinal> <resolution> @ <refresh rate>`. The 
+Modes format is as following: `<ordinal> <resolution> @ <refresh rate> <prefered mode>`. The 
 `<ordinal>` is used later to refer to the mode in other operations (for
 example to set the mode to a desired one).
 
@@ -107,7 +107,7 @@ Physical Size: 300 x 190 mm
 Refresh Rate: 120 kHz
 Position: (0, 0)
 Modes:
-        > 0. 2880 x 1800 @ 120 kHz
+        > 0. 2880 x 1800 @ 120 kHz (*)
           1. 2880 x 1800 @ 60 kHz
           2. 1920 x 1200 @ 120 kHz
           3. 1920 x 1080 @ 120 kHz
@@ -133,7 +133,7 @@ Physical Size: 300 x 190 mm
 Refresh Rate: 120 kHz
 Position: (0, 0)
 Modes:
-          0. 2880 x 1800 @ 120 kHz
+          0. 2880 x 1800 @ 120 kHz (*)
           1. 2880 x 1800 @ 60 kHz
           2. 1920 x 1200 @ 120 kHz
         > 3. 1920 x 1080 @ 120 kHz # the new current mode

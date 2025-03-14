@@ -38,6 +38,7 @@ fn display_transform(value: Transform) -> String {
 
 #[allow(clippy::print_stdout)]
 fn print_modes(head: &Head, configs: &Configurations) {
+    let current_mode = head.current_mode;
     println!("Modes:");
     let mut modes: Vec<&OutputMode> = head
         .mode_ids()
@@ -46,20 +47,22 @@ fn print_modes(head: &Head, configs: &Configurations) {
         .collect();
     modes.sort_by(|a, b| b.cmp(a));
     for (i, mode) in modes.iter().enumerate() {
-        print_mode(mode, i);
+        print_mode(mode, i, current_mode == *mode);
     }
 }
 
 #[allow(clippy::print_stdout)]
-fn print_mode(mode: &OutputMode, index: usize) {
-    let prefered = if mode.prefered() { "\t>" } else { "\t " };
+fn print_mode(mode: &OutputMode, index: usize, current: bool) {
+    let current = if current { "\t>" } else { "\t " };
+    let prefered = if mode.prefered() { "(*)" } else { "" };
     println!(
-        "{} {}. {} x {} @ {} kHz",
-        prefered,
+        "{} {}. {} x {} @ {} kHz {}",
+        current,
         index,
         mode.size().0,
         mode.size().1,
-        f64::from(mode.refresh()).div(1000_f64).round()
+        f64::from(mode.refresh()).div(1000_f64).round(),
+        prefered
     );
 }
 
