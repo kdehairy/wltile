@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
+use tracing::{debug, error, info, trace, warn};
 use wayland_client::Proxy;
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::ZwlrOutputModeV1;
@@ -24,27 +25,27 @@ impl Dispatch<ZwlrOutputConfigurationV1, ()> for State {
     ) {
         match event {
             Event::Succeeded => {
-                log::info!("Update was successful");
+                info!("Update was successful");
                 if let Err(err) = state.sender.send(Status::Succeeded) {
-                    log::error!("error sending status message: {err}");
+                    error!("error sending status message: {err}");
                 }
                 proxy.destroy();
             }
             Event::Failed => {
-                log::warn!("Update failed");
+                warn!("Update failed");
                 if let Err(err) = state.sender.send(Status::Failed) {
-                    log::error!("error sending status message: {err}");
+                    error!("error sending status message: {err}");
                 }
                 proxy.destroy();
             }
             Event::Cancelled => {
-                log::info!("Update was cancelled");
+                info!("Update was cancelled");
                 if let Err(err) = state.sender.send(Status::Cancelled) {
-                    log::error!("error sending status message: {err}");
+                    error!("error sending status message: {err}");
                 }
                 proxy.destroy();
             }
-            _ => log::error!("received undefined event from wayland compositor!"),
+            _ => error!("received undefined event from wayland compositor!"),
         }
     }
 }
@@ -120,8 +121,8 @@ pub struct ConfigWriter {
 impl ConfigWriter {
     pub fn new(wlr_connection: &Connection) -> Self {
         let queue = wlr_connection.new_event_queue();
+        trace!("configurations writer queue created successfully");
         let (sender, receiver) = channel();
-        log::debug!("queue created successfully");
         Self {
             queue_handle: queue.handle(),
             queue,
@@ -137,10 +138,11 @@ impl ConfigWriter {
     ) -> Result<(), String> {
         let output_configuration =
             output_manager.create_configuration(request.serial, &self.queue_handle, ());
+        debug!("output_configuration successfully created");
         let mut appy_please = false;
         for head_request in &request.head_requests {
             let (head, wlr_head) = (head_request.head, head_request.head.wlr_head());
-            log::debug!("Found head with name '{}'", head_request.head.name());
+            debug!("configuring head with name '{}'", head_request.head.name());
             let head_configuration =
                 output_configuration.enable_head(wlr_head, &self.queue_handle, ());
             if Self::reconcile_head_configs(&head_configuration, head, head_request) {
@@ -148,7 +150,7 @@ impl ConfigWriter {
             }
         }
         if appy_please {
-            log::info!("Applying new configurations");
+            info!("Applying new configurations");
             output_configuration.apply();
             if let Err(err) = self.queue.roundtrip(&mut self.state) {
                 return Err(format!("error sending request to compositor: {err}"));
@@ -169,7 +171,7 @@ impl ConfigWriter {
         let mut dirty = false;
         if let Some(position) = request.position.as_ref() {
             if head.position() != position {
-                log::debug!(
+                debug!(
                     "Changes in position detected for head '{}' to {}",
                     head.name(),
                     position
@@ -181,7 +183,7 @@ impl ConfigWriter {
 
         if let Some(mode) = request.mode {
             if *head.current_mode_id() != mode.id() {
-                log::debug!(
+                debug!(
                     "Changes in mode detected for head '{}' to {:?}",
                     head.name(),
                     mode

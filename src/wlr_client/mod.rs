@@ -8,6 +8,7 @@ pub mod errors;
 use config_writer::{ConfigWriter, UpdateRequest};
 use configs::Configurations;
 use errors::ClientError;
+use tracing::{debug, trace};
 
 use std::fmt::{Debug, Display};
 use wayland_client::globals::{registry_queue_init, GlobalListContents};
@@ -68,16 +69,16 @@ impl Client {
         let conn = Connection::connect_to_env()?;
         let (globals, mut queue) = registry_queue_init::<Configurations>(&conn)?;
         self.wlr_connection = Some(conn);
-        log::debug!("queue handle acquired");
+        trace!("queue handle acquired");
 
         let output_manager: ZwlrOutputManagerV1 = globals.bind(&queue.handle(), 4..=4, ())?;
         self.output_manager = Some(output_manager);
-        log::debug!("output_manager acquired");
+        trace!("output_manager acquired");
 
         let mut configs = Configurations::default();
         queue.roundtrip(&mut configs)?;
         self.configurations = Some(configs);
-        log::debug!("configurations received");
+        debug!("configurations received");
         Ok(())
     }
 
@@ -86,6 +87,7 @@ impl Client {
     }
 
     pub fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
+        trace!("received update request: {update_request}");
         let mut config_writer: ConfigWriter = config_writer::ConfigWriter::new(
             self.wlr_connection
                 .as_ref()

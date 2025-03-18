@@ -1,3 +1,5 @@
+use tracing::info;
+
 use crate::{
     cli::{Alignment, Relation},
     heads::Head,
@@ -25,7 +27,7 @@ pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) -> Result<(
         serial: configs.serial(),
         head_requests,
     };
-    log::info!("position request '{}'", request);
+    info!("position request '{}'", request);
     client.update_configurations(&request)
 }
 

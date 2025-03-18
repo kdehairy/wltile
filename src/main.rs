@@ -11,7 +11,6 @@
 mod cli;
 mod functions;
 mod heads;
-mod logging;
 mod wlr_client;
 
 use clap::Parser;
@@ -19,12 +18,26 @@ use cli::Cli;
 use cli::Commands;
 use cli::Property;
 use functions::position::TargetSetup;
+use tracing::level_filters::LevelFilter;
+use tracing::trace;
+use tracing_subscriber::EnvFilter;
 
+#[cfg(debug_assertions)]
+const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::DEBUG;
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::INFO;
+
+#[tracing::instrument()]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(debug_assertions)]
-    {
-        logging::setup();
-    }
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(DEFAULT_LOG_LEVEL.into())
+                .from_env_lossy(),
+        )
+        .init();
 
     let args = Cli::parse();
 
@@ -35,10 +48,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match args.command {
         Commands::List {} => {
+            trace!("cli command: list");
             functions::list::exec(&heads);
             Ok(())
         }
         Commands::Show { output } => {
+            trace!("cli command: show {output}");
             let head = heads.get(&output).ok_or("output does not exist")?;
             functions::show::exec(head, configs);
             Ok(())
@@ -49,6 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             reference,
             alignment,
         } => {
+            trace!("cli command: position {target} {relation} {reference} {alignment}");
             let target_head = heads
                 .get(&target)
                 .cloned()

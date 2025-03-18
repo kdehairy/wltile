@@ -1,3 +1,4 @@
+use tracing::debug;
 use wayland_client::{event_created_child, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_manager_v1::{
@@ -22,11 +23,11 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
     ) {
         match event {
             Head { head } => {
-                log::debug!("Found head {}", head.id());
+                debug!("Found head {}", head.id());
                 state.add_head(head);
             }
             Done { serial } => {
-                log::debug!("serial: {}", serial);
+                debug!("serial: {}", serial);
                 state.set_serial(serial);
             },
             //Finished => {},

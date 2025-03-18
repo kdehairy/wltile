@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Logging level dectated by RUST_LOG env variable.
 
 ## [v0.3.0]
 ### Added

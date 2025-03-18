@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use tracing::{debug, trace};
 use wayland_client::backend::ObjectId;
 use wayland_client::protocol::wl_output::Transform;
 use wayland_client::{event_created_child, Dispatch};
@@ -26,49 +27,49 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
         if let Some(head) = state.get_head_mut(&proxy.id()) {
             match event {
                 Event::Name { name } => {
-                    log::debug!("Head {}: name={}", head.id(), name);
+                    debug!("Head {}: name={}", head.id().to_string(), name);
                     head.name = name;
                 }
                 Event::Description { description } => {
-                    log::trace!("Head {}: description={}", head.id(), description);
+                    trace!("Head {}: description={}", head.id(), description);
                     head.description = description;
                 }
                 Event::PhysicalSize { width, height } => head.physical_size = Point(width, height),
                 Event::Mode { mode } => {
-                    log::trace!("Head {}: mode={}", head.id(), mode.id());
+                    trace!("Head {}: mode={}", head.id(), mode.id());
                     head.add_mode(&mode);
                     state.add_mode(mode);
                 }
                 Event::Enabled { enabled } => head.enabled = !matches!(enabled, 0),
                 Event::CurrentMode { mode } => {
-                    log::debug!("Head {}: current_mode={}", head.id(), mode.id());
+                    debug!("Head {}: current_mode={}", head.id(), mode.id());
                     head.current_mode_id = mode.id();
                 }
                 Event::Position { x, y } => {
-                    log::debug!("Head {}: position={}", head.id(), Point(x, y));
+                    debug!("Head {}: position={}", head.id(), Point(x, y));
                     head.position = Point(x, y);
                 }
                 Event::Finished => {
                     kill_me_please = true;
                 }
                 Event::Make { make } => {
-                    log::trace!("Head {}: make={}", head.id(), make);
+                    trace!("Head {}: make={}", head.id(), make);
                     head.make = make;
                 }
                 Event::Model { model } => {
-                    log::trace!("Head {}: model={}", head.id(), model);
+                    trace!("Head {}: model={}", head.id(), model);
                     head.model = model;
                 }
                 Event::SerialNumber { serial_number } => head.serial_number = serial_number,
                 Event::Scale { scale } => {
-                    log::trace!("Head {}: scale={}", head.id(), scale);
+                    trace!("Head {}: scale={}", head.id(), scale);
                     head.scale = scale;
                 }
                 #[allow(clippy::as_conversions)]
                 Event::Transform {
                     transform: WEnum::Value(transform),
                 } => {
-                    log::trace!("Head {}: trasform={}", head.id(), transform as u8);
+                    trace!("Head {}: trasform={}", head.id(), transform as u8);
                     head.transform = transform;
                 }
                 //Event::AdaptiveSync { state: _ },

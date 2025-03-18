@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use tracing::trace;
 use wayland_client::backend::ObjectId;
 use wayland_client::Dispatch;
 use wayland_client::Proxy;
@@ -22,7 +23,7 @@ impl Dispatch<ZwlrOutputModeV1, ()> for Configurations {
         if let Some(mode) = state.get_mode_mut(&proxy.id()) {
             match event {
                 Event::Size { width, height } => {
-                    log::debug!("Mode {}: size={}", mode.wl_id(), Point(width, height));
+                    trace!("Mode {}: size={}", mode.wl_id(), Point(width, height));
                     mode.size = Point(width, height);
                 }
                 Event::Refresh { refresh } => mode.refresh = refresh,
