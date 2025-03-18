@@ -1,5 +1,7 @@
+#[cfg(debug_assertions)]
 use std::str::FromStr;
 
+#[cfg(debug_assertions)]
 use log4rs::{
     append::file::FileAppender,
     config::{Appender, Root},
