@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [v0.3.1]
 ### Added
 - Logging level dectated by RUST_LOG env variable.
 - Implement changing the "scale" property for an output.
@@ -27,7 +29,8 @@
 - position two displays relative to each other either left or right.
 - while positioning the displays, align them to bottom or top.
 
-[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.0...main
+[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.1...main
+[v0.3.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.1.1...v0.2.0
 [v0.1.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.1.1-alpha.1...v0.1.1
