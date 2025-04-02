@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [v0.3.2]
 ### Fixed
 - Bug detecting scale changes
 
@@ -32,6 +34,7 @@
 - while positioning the displays, align them to bottom or top.
 
 [unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.1...main
+[v0.3.2]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.2.0...v0.3.0
 [v0.2.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.1.1...v0.2.0
