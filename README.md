@@ -103,7 +103,7 @@ wltile set <TARGET_OUTPUT> <PROPERTY> <VALUE>
 
 Arguments:
   <TARGET_OUTPUT>  
-  <PROPERTY>       [possible values: mode]
+  <PROPERTY>       [possible values: mode, scale]
   <VALUE>          
 
 Options:
@@ -136,31 +136,10 @@ Modes:
           11. 800 x 600 @ 120 kHz
           12. 640 x 480 @ 120 kHz
 
-$ wltile set eDP-1 mode 3 # set the desired mode using shown ordinal
+$ wltile set DP-2 mode 3 # set the desired mode using shown ordinal
 
-$ wltile show DP-2 # Show again after changes
-Make: Lenovo Group Limited
-Model: 0x414B
-Size: 2880 x 1800
-Scale: 2
-Transform: 0
-Physical Size: 300 x 190 mm
-Refresh Rate: 120 kHz
-Position: (0, 0)
-Modes:
-          0. 2880 x 1800 @ 120 kHz (*)
-          1. 2880 x 1800 @ 60 kHz
-          2. 1920 x 1200 @ 120 kHz
-        > 3. 1920 x 1080 @ 120 kHz # the new current mode
-          4. 1600 x 1200 @ 120 kHz
-          5. 1680 x 1050 @ 120 kHz
-          6. 1440 x 900 @ 120 kHz
-          7. 1280 x 1024 @ 120 kHz
-          8. 1280 x 800 @ 120 kHz
-          9. 1280 x 720 @ 120 kHz
-          10. 1024 x 768 @ 120 kHz
-          11. 800 x 600 @ 120 kHz
-          12. 640 x 480 @ 120 kHz
+$ wltile set DP-2 scale 1.5 # set the desired scale
+
 ```
 
 # Roadmap

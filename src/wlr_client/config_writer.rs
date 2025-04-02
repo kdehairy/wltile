@@ -1,3 +1,4 @@
+use core::f64;
 use std::fmt::Display;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
@@ -67,6 +68,7 @@ pub struct HeadUpdateRequest<'a> {
     pub head: &'a OutputHead,
     pub position: Option<Point>,
     pub mode: Option<&'a ZwlrOutputModeV1>,
+    pub scale: Option<f64>,
 }
 
 impl Display for HeadUpdateRequest<'_> {
@@ -169,6 +171,7 @@ impl ConfigWriter {
         request: &HeadUpdateRequest,
     ) -> bool {
         let mut dirty = false;
+
         if let Some(position) = request.position.as_ref() {
             if head.position() != position {
                 debug!(
@@ -192,6 +195,19 @@ impl ConfigWriter {
                 dirty = true;
             }
         }
+
+        if let Some(scale) = request.scale {
+            if (head.scale() - scale).abs() < f64::EPSILON {
+                debug!(
+                    "Changes in scale detected for head '{}' to {}",
+                    head.name(),
+                    scale
+                );
+                head_configuration.set_scale(scale);
+                dirty = true;
+            }
+        }
+
         dirty
     }
 }

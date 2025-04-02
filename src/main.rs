@@ -95,11 +95,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .ok_or("target output does not exist")?;
             match property {
                 Property::Mode => {
-                    let desired: usize = value
-                        .trim()
-                        .parse()
-                        .expect("Expected integer identifier for the mode");
-                    functions::set_mode::exec(&target_head, desired, &client)?;
+                    if let Ok(desired) = value.trim().parse::<usize>() {
+                        functions::set_mode::exec(&target_head, desired, &client)?;
+                    } else {
+                        Err("Expected integer identifier for the mode")?;
+                    }
+                }
+                Property::Scale => {
+                    if let Ok(desired) = value.trim().parse::<f64>() {
+                        functions::set_scale::exec(&target_head, desired, &client)?;
+                    } else {
+                        Err("Expected number identifier for the scale")?;
+                    }
                 }
             }
 

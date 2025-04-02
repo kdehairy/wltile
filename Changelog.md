@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Added
 - Logging level dectated by RUST_LOG env variable.
+- Implement changing the "scale" property for an output.
 
 ## [v0.3.0]
 ### Added

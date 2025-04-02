@@ -1,4 +1,11 @@
-use crate::{heads::Head, wlr_client::{self, config_writer::{HeadUpdateRequest, UpdateRequest}, wlr_mode::OutputMode}};
+use crate::{
+    heads::Head,
+    wlr_client::{
+        self,
+        config_writer::{HeadUpdateRequest, UpdateRequest},
+        wlr_mode::OutputMode,
+    },
+};
 
 pub fn exec(head: &Head, mode_idx: usize, client: &wlr_client::Client) -> Result<(), String> {
     let configs = client.configurations()?;
@@ -16,6 +23,7 @@ pub fn exec(head: &Head, mode_idx: usize, client: &wlr_client::Client) -> Result
                 head: head.output_head(),
                 position: None,
                 mode: Some(target_mode.wl_mode()),
+                scale: None,
             }],
         };
         client.update_configurations(&request)?;

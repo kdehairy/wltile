@@ -57,6 +57,7 @@ pub enum Commands {
 #[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
 pub enum Property {
     Mode,
+    Scale,
 }
 
 #[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
