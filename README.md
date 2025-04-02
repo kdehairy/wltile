@@ -1,6 +1,18 @@
 # Overview
 `wltile` is a cli tool that positions outputs/displays for wlroots based compositors.
 
+# Install
+## Cargo
+```sh 
+cargo install wltile`
+```
+
+### Arch Linux
+Available on AUR https://aur.archlinux.org/packages/wltile
+
+```sh 
+paru wltile
+```
 
 # Usage
 ```
