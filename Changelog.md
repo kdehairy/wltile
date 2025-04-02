@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Bug detecting scale changes
 
 ## [v0.3.1]
 ### Added
