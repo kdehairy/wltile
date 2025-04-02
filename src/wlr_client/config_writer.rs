@@ -197,7 +197,7 @@ impl ConfigWriter {
         }
 
         if let Some(scale) = request.scale {
-            if (head.scale() - scale).abs() < f64::EPSILON {
+            if (head.scale() - scale).abs() > f64::EPSILON {
                 debug!(
                     "Changes in scale detected for head '{}' to {}",
                     head.name(),
