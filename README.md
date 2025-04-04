@@ -103,7 +103,7 @@ wltile set <TARGET_OUTPUT> <PROPERTY> <VALUE>
 
 Arguments:
   <TARGET_OUTPUT>  
-  <PROPERTY>       [possible values: mode, scale]
+  <PROPERTY>       [possible values: mode, scale, rotation]
   <VALUE>          
 
 Options:
@@ -136,13 +136,14 @@ Modes:
           11. 800 x 600 @ 120 kHz
           12. 640 x 480 @ 120 kHz
 
-$ wltile set DP-2 mode 3 # set the desired mode using shown ordinal
+# set the desired mode using shown ordinal
+$ wltile set DP-2 mode 3 
 
-$ wltile set DP-2 scale 1.5 # set the desired scale
+$ wltile set DP-2 scale 1.5
+
+$ wltile set DP-2 rotation 270
 
 ```
 
 # Roadmap
-- Change output scale.
-- Change output orientation.
 - Interactive CLI mode

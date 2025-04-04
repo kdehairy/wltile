@@ -24,6 +24,7 @@ pub fn exec(head: &Head, mode_idx: usize, client: &wlr_client::Client) -> Result
                 position: None,
                 mode: Some(target_mode.wl_mode()),
                 scale: None,
+                rotation: None,
             }],
         };
         client.update_configurations(&request)?;

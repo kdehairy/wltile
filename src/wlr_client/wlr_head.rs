@@ -11,6 +11,8 @@ use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_mode_v1::ZwlrOutputModeV1,
 };
 
+use crate::commons::{ToString, TryFrom};
+
 use super::configs::Configurations;
 use super::Point;
 
@@ -200,5 +202,36 @@ impl Display for OutputHead {
             "{} => {} {}: {} at position {}",
             self.name, self.make, self.model, self.physical_size, self.position
         )
+    }
+}
+
+impl TryFrom<i32> for Transform {
+    fn try_from(other: i32) -> Result<Self, String> {
+        let norm = other % 360;
+        let norm = if norm <= 0 { norm } else { norm.saturating_sub(360) };
+
+        match norm {
+            0 => Ok(Transform::Normal),
+            -90 => Ok(Transform::_90),
+            -180 => Ok(Transform::_180),
+            -270 => Ok(Transform::_270),
+            _ => Err(String::from("Invalid angle")),
+        }
+    }
+}
+
+impl ToString for Transform {
+    fn to_string(&self) -> String {
+        match self {
+            Transform::Normal => String::from("0°"),
+            Transform::_90 => String::from("-90°"),
+            Transform::_180 => String::from("-180°"),
+            Transform::_270 => String::from("-270°"),
+            Transform::Flipped => String::from("Flipped"),
+            Transform::Flipped90 => String::from("flipped then rotated 90°"),
+            Transform::Flipped180 => String::from("flipped then rotated 180°"),
+            Transform::Flipped270 => String::from("flipped then rotated 270°"),
+            _ => String::from("?"),
+        }
     }
 }

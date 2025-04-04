@@ -4,6 +4,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
 use tracing::{debug, error, info, trace, warn};
+use wayland_client::protocol::wl_output::Transform;
 use wayland_client::Proxy;
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::ZwlrOutputModeV1;
@@ -12,6 +13,8 @@ use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_configuration_v1::{Event, ZwlrOutputConfigurationV1},
     zwlr_output_manager_v1::ZwlrOutputManagerV1,
 };
+
+use crate::commons::ToString;
 
 use super::{wlr_head::OutputHead, Point};
 
@@ -69,6 +72,7 @@ pub struct HeadUpdateRequest<'a> {
     pub position: Option<Point>,
     pub mode: Option<&'a ZwlrOutputModeV1>,
     pub scale: Option<f64>,
+    pub rotation: Option<Transform>,
 }
 
 impl Display for HeadUpdateRequest<'_> {
@@ -172,8 +176,8 @@ impl ConfigWriter {
     ) -> bool {
         let mut dirty = false;
 
-        if let Some(position) = request.position.as_ref() {
-            if head.position() != position {
+        if let Some(position) = request.position {
+            if *head.position() != position {
                 debug!(
                     "Changes in position detected for head '{}' to {}",
                     head.name(),
@@ -204,6 +208,18 @@ impl ConfigWriter {
                     scale
                 );
                 head_configuration.set_scale(scale);
+                dirty = true;
+            }
+        }
+
+        if let Some(transform) = request.rotation {
+            if head.transform() != transform {
+                debug!(
+                    "Changes in rotation detected for head '{}' to {}",
+                    head.name(),
+                    transform.to_string()
+                );
+                head_configuration.set_transform(transform);
                 dirty = true;
             }
         }

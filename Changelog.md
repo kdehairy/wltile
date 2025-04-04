@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- Implement changing the orientation of an output.
 
 ## [v0.3.2]
 ### Fixed

@@ -58,6 +58,7 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
         position: Some(position),
         mode: None,
         scale: None,
+        rotation: None,
     }
 }
 
@@ -86,6 +87,7 @@ fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<
         position: Some(position),
         mode: None,
         scale: None,
+        rotation: None,
     }
 }
 

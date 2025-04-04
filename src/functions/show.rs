@@ -1,8 +1,7 @@
 use std::ops::Div;
 
-use wayland_client::protocol::wl_output::Transform;
-
 use crate::{
+    commons::ToString,
     heads::Head,
     wlr_client::{configs::Configurations, wlr_mode::OutputMode},
 };
@@ -19,21 +18,7 @@ pub(crate) fn exec(head: &Head, configs: &Configurations) {
 
 #[allow(clippy::print_stdout)]
 fn print_transform(head: &Head) {
-    println!("Transform: {}", display_transform(head.transform()));
-}
-
-fn display_transform(value: Transform) -> String {
-    match value {
-        Transform::Normal => String::from("0"),
-        Transform::_90 => String::from("270"),
-        Transform::_180 => String::from("180"),
-        Transform::_270 => String::from("90"),
-        Transform::Flipped => String::from("Flipped"),
-        Transform::Flipped90 => String::from("flipped then rotated 270"),
-        Transform::Flipped180 => String::from("flipped then rotated 180"),
-        Transform::Flipped270 => String::from("flipped then rotated 90"),
-        _ => String::from("?"),
-    }
+    println!("Rotation: {}", head.transform().to_string());
 }
 
 #[allow(clippy::print_stdout)]

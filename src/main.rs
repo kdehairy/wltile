@@ -12,6 +12,7 @@ mod cli;
 mod functions;
 mod heads;
 mod wlr_client;
+mod commons;
 
 use clap::Parser;
 use cli::Cli;
@@ -106,6 +107,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         functions::set_scale::exec(&target_head, desired, &client)?;
                     } else {
                         Err("Expected number identifier for the scale")?;
+                    }
+                }
+                Property::Rotation => {
+                    if let Ok(desired) = value.trim().parse::<i32>() {
+                        functions::set_rotation::exec(&target_head, desired, &client)?;
+                    } else {
+                        Err("Expected number identifier for the rotation")?;
                     }
                 }
             }
