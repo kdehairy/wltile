@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [v0.3.3]
 - Implement changing the orientation of an output.
 
 ## [v0.3.2]
@@ -34,7 +36,8 @@
 - position two displays relative to each other either left or right.
 - while positioning the displays, align them to bottom or top.
 
-[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.1...main
+[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.3...main
+[v0.3.3]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.2.0...v0.3.0
