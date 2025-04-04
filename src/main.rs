@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let heads = configs.heads()?;
 
     match args.command {
-        Commands::List {} => {
+        Commands::List => {
             trace!("cli command: list");
             functions::list::exec(&heads);
             Ok(())
