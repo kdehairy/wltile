@@ -1,6 +1,6 @@
 [package]
 name = "wltile"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Khaled Eldoheiri <khaled@eldoheiri.com>"]
 edition = "2021"
 description = "A cli tool that positions outputs/displays for wlroots based compositors"
