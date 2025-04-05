@@ -33,24 +33,22 @@ impl Dispatch<ZwlrOutputConfigurationV1, ()> for State {
                 if let Err(err) = state.sender.send(Status::Succeeded) {
                     error!("error sending status message: {err}");
                 }
-                proxy.destroy();
             }
             Event::Failed => {
                 warn!("Update failed");
                 if let Err(err) = state.sender.send(Status::Failed) {
                     error!("error sending status message: {err}");
                 }
-                proxy.destroy();
             }
             Event::Cancelled => {
                 info!("Update was cancelled");
                 if let Err(err) = state.sender.send(Status::Cancelled) {
                     error!("error sending status message: {err}");
                 }
-                proxy.destroy();
             }
             _ => error!("received undefined event from wayland compositor!"),
         }
+        proxy.destroy();
     }
 }
 
