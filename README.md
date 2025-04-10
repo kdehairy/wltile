@@ -83,9 +83,9 @@ wltile position <TARGET_OUTPUT> <RELATION> <REFERENCE_OUTPUT> [ALIGNMENT]
 
 Arguments:
   <TARGET_OUTPUT>     Output to be positioned
-  <RELATION>          How is it positioned to the reference output [possible values: left-of, right-of]
+  <RELATION>          How is it positioned to the reference output [possible values: left-of, right-of, top-of, bottom-of]
   <REFERENCE_OUTPUT>  Reference Output
-  [ALIGNMENT]         Alignment [default: align-bottom] [possible values: align-bottom, align-top]
+  [ALIGNMENT]         Alignment [default: align-bottom] [possible values: align-bottom, align-top, align-right, align-left]
 
 Options:
   -h, --help  Print help
