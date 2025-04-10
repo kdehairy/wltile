@@ -144,6 +144,3 @@ $ wltile set DP-2 scale 1.5
 $ wltile set DP-2 rotation 270
 
 ```
-
-# Roadmap
-- Interactive CLI mode

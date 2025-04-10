@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [v1.0.0]
 ### Added
 - Support Vertical alignment (top and bottom) in position command.
 
@@ -44,6 +46,7 @@
 - while positioning the displays, align them to bottom or top.
 
 [unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.4...main
+[v1.0.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.4...v1.0.0
 [v0.3.4]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.1...v0.3.2
