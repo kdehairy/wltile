@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Support Vertical alignment (top and bottom) in position command.
 
 ## [v0.3.4]
 ### Fixed

@@ -41,6 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let args = Cli::parse();
+    cli::validate(&args)?;
 
     let mut client = wlr_client::Client::new();
     client.connect()?;

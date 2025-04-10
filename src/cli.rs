@@ -41,15 +41,18 @@ pub enum Commands {
         #[arg(value_name="ALIGNMENT", default_value_t= Alignment::AlignBottom)]
         alignment: Alignment,
     },
-    #[command(about = "Sets properties of the output to a desired value", arg_required_else_help = true)]
+    #[command(
+        about = "Sets properties of the output to a desired value",
+        arg_required_else_help = true
+    )]
     Set {
         #[arg(value_name = "TARGET_OUTPUT")]
         target: String,
 
-        #[arg(value_name="PROPERTY")]
+        #[arg(value_name = "PROPERTY")]
         property: Property,
 
-        #[arg(value_name="VALUE")]
+        #[arg(value_name = "VALUE")]
         value: String,
     },
 }
@@ -61,25 +64,35 @@ pub enum Property {
     Rotation,
 }
 
+// Postfix is functionally needed here
+#[allow(clippy::enum_variant_names)]
 #[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
 pub enum Relation {
     LeftOf,
     RightOf,
+    TopOf,
+    BottomOf,
 }
 
 impl Display for Relation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Relation::LeftOf => write!(f, "left of"),
-            Relation::RightOf => write!(f, "right of"),
+            Relation::LeftOf => write!(f, "left-of"),
+            Relation::RightOf => write!(f, "right-of"),
+            Relation::TopOf => write!(f, "top-of"),
+            Relation::BottomOf => write!(f, "bottom-of"),
         }
     }
 }
 
+// Prefix is functionally needed here
+#[allow(clippy::enum_variant_names)]
 #[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
 pub enum Alignment {
     AlignBottom,
     AlignTop,
+    AlignRight,
+    AlignLeft,
 }
 
 impl Display for Alignment {
@@ -87,6 +100,33 @@ impl Display for Alignment {
         match self {
             Alignment::AlignBottom => write!(f, "align-bottom"),
             Alignment::AlignTop => write!(f, "align-top"),
+            Alignment::AlignRight => write!(f, "align-right"),
+            Alignment::AlignLeft => write!(f, "align-left"),
         }
+    }
+}
+
+pub(crate) fn validate(args: &Cli) -> Result<(), String> {
+    match &args.command {
+        Commands::Position {
+            relation,
+            alignment,
+            ..
+        } => match (relation, alignment) {
+            (Relation::LeftOf | Relation::RightOf, Alignment::AlignRight) => Err(String::from(
+                "Impossible to align right on a horizontal setup",
+            )),
+            (Relation::RightOf | Relation::LeftOf, Alignment::AlignLeft) => Err(String::from(
+                "Impossible to align left on a horizontal setup",
+            )),
+            (Relation::TopOf | Relation::BottomOf, Alignment::AlignBottom) => Err(String::from(
+                "Impossible to align bottom on a vertical setup",
+            )),
+            (Relation::TopOf | Relation::BottomOf, Alignment::AlignTop) => Err(String::from(
+                "Impossible to align top on a horizontal setup",
+            )),
+            _ => Ok(()),
+        },
+        _ => Ok(()),
     }
 }

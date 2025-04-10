@@ -52,13 +52,13 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
     debug!("{} size: {target_size}", target_setup.target.name());
     debug!("{} size: {reference_size}", target_setup.reference.name());
     let mut position = match target_setup.relation {
-        Relation::RightOf => Point(0, 0),
-        Relation::LeftOf => target_size,
+        Relation::RightOf | Relation::BottomOf => Point(0, 0),
+        Relation::LeftOf | Relation::TopOf => target_size,
     };
     let position = match target_setup.alignment {
         Alignment::AlignBottom => {
             position.1 = if reference_size.1 < target_size.1 {
-                i32::abs(target_size.1.saturating_sub(reference_size.1))
+                target_size.1.saturating_sub(reference_size.1).abs()
             } else {
                 0
             };
@@ -66,6 +66,18 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
         }
         Alignment::AlignTop => {
             position.1 = 0;
+            position
+        }
+        Alignment::AlignRight => {
+            position.0 = if reference_size.0 < target_size.0 {
+                target_size.0.saturating_sub(reference_size.0).abs()
+            } else {
+                0
+            };
+            position
+        }
+        Alignment::AlignLeft => {
+            position.0 = 0;
             position
         }
     };
@@ -82,8 +94,8 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
 fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<'a> {
     let (target_size, reference_size) = scaled_corrected_sizes(target_setup);
     let mut position = match target_setup.relation {
-        Relation::RightOf => reference_size,
-        Relation::LeftOf => Point(0, 0),
+        Relation::RightOf | Relation::BottomOf => reference_size,
+        Relation::LeftOf | Relation::TopOf => Point(0, 0),
     };
     let position = match target_setup.alignment {
         Alignment::AlignBottom => {
@@ -96,6 +108,18 @@ fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<
         }
         Alignment::AlignTop => {
             position.1 = 0;
+            position
+        }
+        Alignment::AlignRight => {
+            position.0 = if target_size.0 < reference_size.0 {
+                target_size.0.saturating_sub(reference_size.0).abs()
+            } else {
+                0
+            };
+            position
+        }
+        Alignment::AlignLeft => {
+            position.0 = 0;
             position
         }
     };
