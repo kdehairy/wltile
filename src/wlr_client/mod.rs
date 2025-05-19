@@ -52,7 +52,7 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Configurations {
 
 /// wlroots client that handles communication with the compositor.
 ///
-/// The client is unusable until the first invokation of connect() method.
+/// The client is unusable until the first invokation of `connect()` method.
 pub struct Client {
     configurations: Option<Configurations>,
     output_manager: Option<ZwlrOutputManagerV1>,

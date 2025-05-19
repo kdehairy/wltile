@@ -21,7 +21,6 @@ use cli::Property;
 use functions::position::TargetSetup;
 use tracing::level_filters::LevelFilter;
 use tracing::trace;
-use tracing_subscriber::EnvFilter;
 
 #[cfg(debug_assertions)]
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::DEBUG;
@@ -31,17 +30,22 @@ const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::ERROR;
 
 #[tracing::instrument()]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .with_env_filter(
-            EnvFilter::builder()
-                .with_default_directive(DEFAULT_LOG_LEVEL.into())
-                .from_env_lossy(),
-        )
-        .init();
-
     let args = Cli::parse();
     cli::validate(&args)?;
+
+    let log_level = match args.verbose {
+        0 => DEFAULT_LOG_LEVEL,
+        1 => LevelFilter::INFO,
+        2 => LevelFilter::DEBUG,
+        _ => LevelFilter::TRACE,
+    };
+
+
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_max_level(log_level)
+        .init();
+
 
     let mut client = wlr_client::Client::new();
     client.connect()?;

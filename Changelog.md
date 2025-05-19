@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Verbosity flag (-v[v[v]]).
+
+### Changed
+- Default logging verbosity in release to ERROR.
 
 ## [v1.0.0]
 ### Added

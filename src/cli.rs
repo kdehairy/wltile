@@ -6,6 +6,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(name = "wltile")]
 #[command(about = "A tool for wlroot based compositors to configure outputs layout", long_about = None)]
 pub struct Cli {
+    #[arg(short='v', action = clap::ArgAction::Count)]
+    pub verbose: u8,
     #[command(subcommand)]
     pub command: Commands,
 }
