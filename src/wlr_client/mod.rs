@@ -50,6 +50,9 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Configurations {
     }
 }
 
+/// wlroots client that handles communication with the compositor.
+///
+/// The client is unusable until the first invokation of connect() method.
 pub struct Client {
     configurations: Option<Configurations>,
     output_manager: Option<ZwlrOutputManagerV1>,
@@ -65,6 +68,7 @@ impl Client {
         }
     }
 
+    /// Connects to the wlroots compositor and receive the outputs configurations.
     pub fn connect(&mut self) -> Result<(), ClientError> {
         let conn = Connection::connect_to_env()?;
         let (globals, mut queue) = registry_queue_init::<Configurations>(&conn)?;
@@ -86,6 +90,7 @@ impl Client {
         self.configurations.as_ref().ok_or(String::from("failed to acquire current configurations"))
     }
 
+    /// Updates the outputs configurations to match the provided request.
     pub fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
         trace!("received update request: {update_request}");
         let mut config_writer: ConfigWriter = config_writer::ConfigWriter::new(

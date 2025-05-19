@@ -27,7 +27,7 @@ use tracing_subscriber::EnvFilter;
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::DEBUG;
 
 #[cfg(not(debug_assertions))]
-const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::INFO;
+const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::ERROR;
 
 #[tracing::instrument()]
 fn main() -> Result<(), Box<dyn std::error::Error>> {

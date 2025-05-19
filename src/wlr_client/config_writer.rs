@@ -115,6 +115,7 @@ enum Status {
     Cancelled,
 }
 
+/// Handles passing the desired configurations to the compositor.
 pub struct ConfigWriter {
     queue: EventQueue<State>,
     queue_handle: QueueHandle<State>,
@@ -135,6 +136,7 @@ impl ConfigWriter {
         }
     }
 
+    /// Handles sending the requests to the compositor to update the outputs configurations.
     pub fn write(
         &mut self,
         request: &UpdateRequest,
