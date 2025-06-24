@@ -17,11 +17,10 @@ pub enum Commands {
     #[command(about = "Lists all connected outputs")]
     List,
 
-    #[command(about = "Shows detailed info for the specified output")]
-    #[command(arg_required_else_help = true)]
+    #[command(about = "Shows the current layout. If an output is provided as argument, it shows detailed info for the specified output")]
     Show {
         #[arg(value_name = "OUTPUT")]
-        output: String,
+        output: Option<String>,
     },
 
     #[command(about = "Position outputs")]

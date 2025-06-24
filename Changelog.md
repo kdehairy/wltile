@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Added
 - Verbosity flag (-v[v[v]]).
+- `show` command without arguments displays ports on relevant outputs.
 
 ### Changed
 - Default logging verbosity in release to ERROR.

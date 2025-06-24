@@ -1,4 +1,3 @@
-use std::collections::hash_map::Values;
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -20,8 +19,8 @@ impl<'a> Heads<'a> {
         self.heads.insert(name, head);
     }
 
-    pub fn heads(&self) -> Values<'_, String, Head> {
-        self.heads.values()
+    pub fn heads(&self) -> Vec<&Head> {
+        self.heads.values().collect()
     }
 
     pub fn get(&self, name: &str) -> Option<&Head> {

@@ -9,10 +9,10 @@
 )]
 
 mod cli;
+mod commons;
 mod functions;
 mod heads;
 mod wlr_client;
-mod commons;
 
 use clap::Parser;
 use cli::Cli;
@@ -40,12 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => LevelFilter::TRACE,
     };
 
-
     tracing_subscriber::fmt()
         .with_target(false)
         .with_max_level(log_level)
         .init();
-
 
     let mut client = wlr_client::Client::new();
     client.connect()?;
@@ -58,11 +56,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             functions::list::exec(&heads);
             Ok(())
         }
-        Commands::Show { output } => {
-            trace!("cli command: show {output}");
-            let head = heads.get(&output).ok_or("output does not exist")?;
-            functions::show::exec(head, configs);
-            Ok(())
+        Commands::Show { output: Some(output) } => {
+                trace!("cli command: show {output}");
+                let head = heads.get(&output).ok_or("output does not exist")?;
+                functions::show_output::exec(head, configs);
+                Ok(())
+        }
+        Commands::Show { output: None } => {
+                trace!("cli command: show");
+                functions::show::exec(configs);
+                Ok(())
         }
         Commands::Position {
             target,
