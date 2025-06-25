@@ -9,7 +9,7 @@ use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::{
 };
 
 use super::configs::Configurations;
-use super::Point;
+use super::point::Point;
 
 impl Dispatch<ZwlrOutputModeV1, ()> for Configurations {
     fn event(

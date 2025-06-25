@@ -7,7 +7,7 @@ use wayland_client::protocol::wl_output::Transform;
 use crate::wlr_client::wlr_mode::OutputMode;
 
 use super::wlr_client::wlr_head::OutputHead;
-use super::wlr_client::Point;
+use super::wlr_client::point::Point;
 
 #[derive(Default)]
 pub struct Heads<'a> {

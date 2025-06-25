@@ -7,7 +7,7 @@ use crate::{
     wlr_client::{
         self,
         config_writer::{HeadUpdateRequest, UpdateRequest},
-        Point,
+        point::Point,
     },
 };
 
@@ -165,4 +165,3 @@ fn scaled_corrected_sizes(target_setup: &TargetSetup) -> (Point, Point) {
 
     (target, reference)
 }
-

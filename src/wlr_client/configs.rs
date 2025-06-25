@@ -76,5 +76,4 @@ impl Configurations {
     pub(crate) fn serial(&self) -> u32 {
         self.serial
     }
-
 }
