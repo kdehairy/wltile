@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub fn exec(head: &Head, angle: i32, client: &wlr_client::Client) -> Result<(), String> {
-    let configs = client.configurations()?;
+    let configs = client.configurations();
 
     let transform = <Transform as TryFrom<i32>>::try_from(angle)?;
 

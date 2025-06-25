@@ -7,7 +7,7 @@ use crate::{
 };
 
 pub fn exec(head: &Head, scale: f64, client: &wlr_client::Client) -> Result<(), String> {
-    let configs = client.configurations()?;
+    let configs = client.configurations();
 
     let request = UpdateRequest {
         serial: configs.serial(),

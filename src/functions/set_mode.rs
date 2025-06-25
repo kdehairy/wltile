@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub fn exec(head: &Head, mode_idx: usize, client: &wlr_client::Client) -> Result<(), String> {
-    let configs = client.configurations()?;
+    let configs = client.configurations();
     let mut modes: Vec<&OutputMode> = head
         .mode_ids()
         .iter()
@@ -22,7 +22,7 @@ pub fn exec(head: &Head, mode_idx: usize, client: &wlr_client::Client) -> Result
             head_requests: vec![HeadUpdateRequest {
                 head: head.output_head(),
                 position: None,
-                mode: Some(target_mode.wl_mode()),
+                mode: Some(target_mode.wlr_mode()),
                 scale: None,
                 rotation: None,
             }],

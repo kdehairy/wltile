@@ -195,6 +195,12 @@ impl OutputHead {
     }
 }
 
+impl Drop for OutputHead {
+    fn drop(&mut self) {
+        self.wlr_head.release();
+    }
+}
+
 impl Display for OutputHead {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(

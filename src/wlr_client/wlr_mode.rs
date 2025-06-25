@@ -71,8 +71,14 @@ impl OutputMode {
         self.prefered
     }
 
-    pub fn wl_mode(&self) -> &ZwlrOutputModeV1 {
+    pub fn wlr_mode(&self) -> &ZwlrOutputModeV1 {
         &self.wlr_mode
+    }
+}
+
+impl Drop for OutputMode {
+    fn drop(&mut self) {
+        self.wlr_mode.release();
     }
 }
 

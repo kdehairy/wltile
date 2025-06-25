@@ -45,9 +45,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_max_level(log_level)
         .init();
 
-    let mut client = wlr_client::Client::new();
-    client.connect()?;
-    let configs = client.configurations()?;
+    let client = wlr_client::Client::new()?;
+    let configs = client.configurations();
     let heads = configs.heads()?;
 
     match args.command {

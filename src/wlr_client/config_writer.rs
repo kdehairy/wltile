@@ -16,7 +16,7 @@ use wayland_protocols_wlr::output_management::v1::client::{
 
 use crate::commons::ToString;
 
-use super::{wlr_head::OutputHead, point::Point};
+use super::{point::Point, wlr_head::OutputHead};
 
 impl Dispatch<ZwlrOutputConfigurationV1, ()> for State {
     fn event(
@@ -158,15 +158,20 @@ impl ConfigWriter {
         if appy_please {
             info!("Applying new configurations");
             output_configuration.apply();
+            let result;
             if let Err(err) = self.queue.roundtrip(&mut self.state) {
-                return Err(format!("error sending request to compositor: {err}"));
+                result = Err(format!("error sending request to compositor: {err}"));
+            } else if let Ok(Status::Succeeded) = self.status_receiver.recv_timeout(Duration::new(5, 0)) {
+                result = Ok(());
+            } else {
+                result = Err(String::from("failed to update configurations"));
             }
-            if let Ok(Status::Succeeded) = self.status_receiver.recv_timeout(Duration::new(5, 0)) {
-                return Ok(());
-            }
-            return Err(String::from("failed to update configurations"));
+            output_configuration.destroy();
+            result
+        } else {
+            output_configuration.destroy();
+            Ok(())
         }
-        Ok(())
     }
 
     fn reconcile_head_configs(

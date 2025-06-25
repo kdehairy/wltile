@@ -12,7 +12,7 @@ use configs::Configurations;
 use errors::ClientError;
 use tracing::{debug, trace};
 
-use wayland_client::globals::{registry_queue_init, GlobalListContents};
+use wayland_client::globals::{registry_queue_init, GlobalList, GlobalListContents};
 use wayland_client::protocol::wl_registry::{self};
 use wayland_client::{Connection, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
@@ -33,57 +33,54 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Configurations {
 ///
 /// The client is unusable until the first invokation of `connect()` method.
 pub struct Client {
-    configurations: Option<Configurations>,
-    output_manager: Option<ZwlrOutputManagerV1>,
-    wlr_connection: Option<Connection>,
+    globals: GlobalList,
+    configurations: Configurations,
+    output_manager: ZwlrOutputManagerV1,
+    wlr_connection: Connection,
 }
 
 impl Client {
-    pub fn new() -> Self {
-        Client {
-            configurations: None,
-            output_manager: None,
-            wlr_connection: None,
-        }
-    }
-
     /// Connects to the wlroots compositor and receive the outputs configurations.
-    pub fn connect(&mut self) -> Result<(), ClientError> {
+    pub fn new() -> Result<Client, ClientError> {
         let conn = Connection::connect_to_env()?;
         let (globals, mut queue) = registry_queue_init::<Configurations>(&conn)?;
-        self.wlr_connection = Some(conn);
         trace!("queue handle acquired");
 
         let output_manager: ZwlrOutputManagerV1 = globals.bind(&queue.handle(), 4..=4, ())?;
-        self.output_manager = Some(output_manager);
         trace!("output_manager acquired");
 
-        let mut configs = Configurations::default();
-        queue.roundtrip(&mut configs)?;
-        self.configurations = Some(configs);
+        // globals.contents().with_list(|list| {
+        //     for i in list {
+        //         println!("{}", i.interface);
+        //     }
+        // });
+
+        let mut configurations = Configurations::default();
+        queue.roundtrip(&mut configurations)?;
         debug!("configurations received");
-        Ok(())
+        Ok(
+            Client {
+                globals,
+                configurations,
+                output_manager,
+                wlr_connection: conn,
+            }
+)
     }
 
-    pub fn configurations(&self) -> Result<&Configurations, String> {
-        self.configurations
-            .as_ref()
-            .ok_or(String::from("failed to acquire current configurations"))
+    pub fn configurations(&self) -> &Configurations {
+        &self.configurations
     }
 
     /// Updates the outputs configurations to match the provided request.
     pub fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
         trace!("received update request: {update_request}");
         let mut config_writer: ConfigWriter = config_writer::ConfigWriter::new(
-            self.wlr_connection
-                .as_ref()
-                .ok_or("failed to initialize wlr_client")?,
+            &self.wlr_connection
         );
         config_writer.write(
             update_request,
-            self.output_manager
-                .as_ref()
-                .ok_or("failed to initialize wlr_client")?,
+            &self.output_manager
         )
     }
 }
