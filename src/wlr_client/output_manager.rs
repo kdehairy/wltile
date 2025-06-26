@@ -2,7 +2,7 @@ use tracing::debug;
 use wayland_client::{event_created_child, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_manager_v1::{
-        Event::Done, Event::Head, 
+        Event::Done, Event::Head,
         ZwlrOutputManagerV1,
         EVT_HEAD_OPCODE,
     },

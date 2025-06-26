@@ -1,71 +1,63 @@
 pub mod config_writer;
 pub mod configs;
+mod connection_manager;
+pub mod display;
 pub mod errors;
 mod output_manager;
 pub mod point;
+pub mod shmem;
+mod wl_compositor;
+mod wl_shm;
 pub mod wlr_head;
 pub mod wlr_mode;
-pub mod shmem;
 
 use config_writer::{ConfigWriter, UpdateRequest};
 use configs::Configurations;
+use display::DisplayServer;
 use errors::ClientError;
 use tracing::{debug, trace};
 
-use wayland_client::globals::{registry_queue_init, GlobalList, GlobalListContents};
-use wayland_client::protocol::wl_registry::{self};
-use wayland_client::{Connection, Dispatch};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
-impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Configurations {
-    fn event(
-        _state: &mut Self,
-        _proxy: &wl_registry::WlRegistry,
-        _event: <wl_registry::WlRegistry as wayland_client::Proxy>::Event,
-        _data: &GlobalListContents,
-        _conn: &wayland_client::Connection,
-        _qhandle: &wayland_client::QueueHandle<Self>,
-    ) {
-    }
-}
+use crate::wlr_client::connection_manager::ConnectionManager;
+use crate::wlr_client::point::Point;
 
 /// wlroots client that handles communication with the compositor.
 ///
 /// The client is unusable until the first invokation of `connect()` method.
 pub struct Client {
-    globals: GlobalList,
     configurations: Configurations,
     output_manager: ZwlrOutputManagerV1,
-    wlr_connection: Connection,
+    connection_manager: ConnectionManager,
+    display_server: Option<DisplayServer>,
 }
 
 impl Client {
     /// Connects to the wlroots compositor and receive the outputs configurations.
     pub fn new() -> Result<Client, ClientError> {
-        let conn = Connection::connect_to_env()?;
-        let (globals, mut queue) = registry_queue_init::<Configurations>(&conn)?;
-        trace!("queue handle acquired");
-
-        let output_manager: ZwlrOutputManagerV1 = globals.bind(&queue.handle(), 4..=4, ())?;
-        trace!("output_manager acquired");
-
-        // globals.contents().with_list(|list| {
-        //     for i in list {
-        //         println!("{}", i.interface);
-        //     }
-        // });
+        let mut conn_man = ConnectionManager::connect()?;
+        let mut queue = conn_man.new_queue();
+        let queue_handle = queue.handle();
 
         let mut configurations = Configurations::default();
-        queue.roundtrip(&mut configurations)?;
+        let output_manager: ZwlrOutputManagerV1 = conn_man.bind_global(&queue_handle, 4..=4, ())?;
+        trace!("output_manager is binded");
+        conn_man.sync()?;
+        queue.dispatch_pending(&mut configurations)?;
         debug!("configurations received");
-        Ok(
-            Client {
-                globals,
-                configurations,
-                output_manager,
-                wlr_connection: conn,
-            }
-)
+
+        // let display_server = DisplayServer::start(
+        //     &mut conn_man,
+        // )?;
+
+        trace!("started display server");
+
+        Ok(Client {
+            configurations,
+            output_manager,
+            connection_manager: conn_man,
+            display_server: None,
+        })
     }
 
     pub fn configurations(&self) -> &Configurations {
@@ -75,12 +67,36 @@ impl Client {
     /// Updates the outputs configurations to match the provided request.
     pub fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
         trace!("received update request: {update_request}");
-        let mut config_writer: ConfigWriter = config_writer::ConfigWriter::new(
-            &self.wlr_connection
+        let mut config_writer: ConfigWriter =
+            config_writer::ConfigWriter::new(&self.connection_manager);
+        config_writer.write(update_request, &self.output_manager)
+    }
+
+    pub fn render_text(&mut self, text: &str, position: Point) -> Result<(), ClientError> {
+        trace!(
+            "received text '{}' to render at position {}",
+            text,
+            position
         );
-        config_writer.write(
-            update_request,
-            &self.output_manager
-        )
+
+        if self.display_server.is_none() {
+            let display_server = DisplayServer::start(&mut self.connection_manager)?;
+            self.display_server = Some(display_server);
+        }
+
+        let display_server = self.display_server.as_ref().expect("Should not happen");
+
+        if let Err(err) = display_server.write(text) {
+            return Err(ClientError::Display {
+                msg: format!("failed to render text. {err}"),
+            });
+        };
+        Ok(())
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        self.output_manager.stop();
     }
 }

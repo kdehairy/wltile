@@ -7,14 +7,14 @@ use std::{
 use errno::errno;
 use libc::{
     c_char, c_void, close, fcntl, ftruncate64, memfd_create, mmap, munmap, F_ADD_SEALS,
-    F_SEAL_EXEC, F_SEAL_GROW, F_SEAL_SEAL, F_SEAL_SHRINK, MAP_FAILED, MAP_SHARED,
-    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE,
+    F_SEAL_GROW, F_SEAL_SEAL, F_SEAL_SHRINK, MAP_FAILED, MAP_SHARED, MFD_ALLOW_SEALING,
+    MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE,
 };
 
-struct Shmem {
-    fd: OwnedFd,
-    addr: *mut u8,
-    size: usize,
+pub(crate) struct Shmem {
+    pub fd: OwnedFd,
+    pub addr: *mut u8,
+    pub size: usize,
 }
 
 impl Drop for Shmem {
@@ -28,7 +28,7 @@ impl Drop for Shmem {
 const DEBUG_NAME: &CStr = c"wltileshmem";
 
 impl Shmem {
-    fn create(size: usize) -> Result<Shmem, io::Error> {
+    pub fn create(size: usize) -> Result<Shmem, io::Error> {
         let flags = MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_NOEXEC_SEAL;
         let seals = F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
         unsafe {
@@ -70,7 +70,9 @@ impl Shmem {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::read_link, os::fd::AsRawFd};
+    use std::{ffi::c_void, fs::read_link, os::fd::AsRawFd, slice};
+
+    use libc::{mmap, munmap, MAP_SHARED, PROT_READ};
 
     use crate::wlr_client::shmem::{Shmem, DEBUG_NAME};
 
@@ -84,5 +86,28 @@ mod tests {
             s.starts_with(format!("/memfd:{name}").as_str())
         });
         assert!(debug_name.is_some());
+    }
+
+    #[test]
+    fn full_flow() {
+        let buff = "this is a test";
+        let shmem = Shmem::create(buff.len()).unwrap();
+        unsafe {
+            std::ptr::copy(buff.as_ptr(), shmem.addr, buff.len());
+        };
+        unsafe {
+            let addr = mmap(
+                std::ptr::null_mut(),
+                shmem.size, // usize is a size_t
+                PROT_READ,
+                MAP_SHARED,
+                shmem.fd.as_raw_fd(),
+                0,
+            )
+            .cast::<u8>();
+            let val = slice::from_raw_parts(addr, buff.len());
+            assert_eq!(val, buff.as_bytes());
+            munmap(addr.cast::<c_void>(), buff.len());
+        };
     }
 }

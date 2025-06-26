@@ -15,6 +15,7 @@ use wayland_protocols_wlr::output_management::v1::client::{
 };
 
 use crate::commons::ToString;
+use crate::wlr_client::ConnectionManager;
 
 use super::{point::Point, wlr_head::OutputHead};
 
@@ -124,8 +125,8 @@ pub struct ConfigWriter {
 }
 
 impl ConfigWriter {
-    pub fn new(wlr_connection: &Connection) -> Self {
-        let queue = wlr_connection.new_event_queue();
+    pub(super) fn new(conn_man: &ConnectionManager) -> Self {
+        let queue = conn_man.new_queue();
         trace!("configurations writer queue created successfully");
         let (sender, receiver) = channel();
         Self {

@@ -14,8 +14,10 @@ categories = ["command-line-utilities"]
 clap = { version = "4.5.30", features = ["derive"] }
 colored = "3.0.0"
 errno = "0.3.13"
+fontdue = "0.9.3"
 libc = "0.2.174"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 wayland-client = "0.31.8"
+wayland-protocols = "0.32.8"
 wayland-protocols-wlr = { version = "0.3.6", features = ["client"] }

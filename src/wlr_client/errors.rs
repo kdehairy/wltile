@@ -1,19 +1,41 @@
 use std::fmt::Display;
 
-use wayland_client::{globals::{BindError, GlobalError}, ConnectError, DispatchError};
+use wayland_client::{
+    backend::WaylandError,
+    globals::{BindError, GlobalError},
+    ConnectError, DispatchError,
+};
 
 #[derive(Debug)]
 pub enum ClientError {
     Connection { msg: String },
     Binding { msg: String },
     Dispatch { msg: String },
+    Display { msg: String },
 }
 
 impl From<GlobalError> for ClientError {
     fn from(value: GlobalError) -> Self {
         match value {
-            GlobalError::Backend(err) => ClientError::Connection { msg: err.to_string() },
-            GlobalError::InvalidId(err) => ClientError::Connection { msg: err.to_string() },
+            GlobalError::Backend(err) => ClientError::Connection {
+                msg: err.to_string(),
+            },
+            GlobalError::InvalidId(err) => ClientError::Connection {
+                msg: err.to_string(),
+            },
+        }
+    }
+}
+
+impl From<WaylandError> for ClientError {
+    fn from(value: WaylandError) -> Self {
+        match value {
+            WaylandError::Io(err) => ClientError::Connection {
+                msg: err.to_string(),
+            },
+            WaylandError::Protocol(err) => ClientError::Connection {
+                msg: err.to_string(),
+            },
         }
     }
 }
@@ -29,6 +51,9 @@ impl Display for ClientError {
             }
             ClientError::Dispatch { msg } => {
                 write!(f, "failed to dispatch message: {msg}")
+            }
+            ClientError::Display { msg } => {
+                write!(f, "failed to render on display: {msg}")
             }
         }
     }
@@ -74,4 +99,3 @@ impl From<DispatchError> for ClientError {
 }
 
 impl std::error::Error for ClientError {}
-

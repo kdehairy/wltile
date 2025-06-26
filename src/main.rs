@@ -45,26 +45,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_max_level(log_level)
         .init();
 
-    let client = wlr_client::Client::new()?;
-    let configs = client.configurations();
-    let heads = configs.heads()?;
 
     match args.command {
         Commands::List => {
             trace!("cli command: list");
+            let client = wlr_client::Client::new()?;
+            let configs = client.configurations();
+            let heads = configs.heads()?;
             functions::list::exec(&heads);
             Ok(())
         }
-        Commands::Show { output: Some(output) } => {
-                trace!("cli command: show {output}");
-                let head = heads.get(&output).ok_or("output does not exist")?;
-                functions::show_output::exec(head, configs);
-                Ok(())
+        Commands::Show {
+            output: Some(output),
+        } => {
+            trace!("cli command: show {output}");
+            let client = wlr_client::Client::new()?;
+            let configs = client.configurations();
+            let heads = configs.heads()?;
+            let head = heads.get(&output).ok_or("output does not exist")?;
+            functions::show_output::exec(head, configs);
+            Ok(())
         }
         Commands::Show { output: None } => {
-                trace!("cli command: show");
-                functions::show::exec(configs);
-                Ok(())
+            trace!("cli command: show");
+            let mut client = wlr_client::Client::new()?;
+            functions::show::exec(&mut client)?;
+            Ok(())
         }
         Commands::Position {
             target,
@@ -73,6 +79,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             alignment,
         } => {
             trace!("cli command: position {target} {relation} {reference} {alignment}");
+            let client = wlr_client::Client::new()?;
+            let configs = client.configurations();
+            let heads = configs.heads()?;
             let target_head = heads
                 .get(&target)
                 .cloned()
@@ -97,6 +106,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             property,
             value,
         } => {
+            let client = wlr_client::Client::new()?;
+            let configs = client.configurations();
+            let heads = configs.heads()?;
             let target_head = heads
                 .get(&target)
                 .cloned()
