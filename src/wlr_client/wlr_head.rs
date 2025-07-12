@@ -91,7 +91,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
     ]);
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OutputHead {
     id: ObjectId,
     #[allow(clippy::struct_field_names)]

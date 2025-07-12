@@ -1,11 +1,12 @@
 use std::{
     ops::RangeInclusive,
     os::fd::OwnedFd,
+    rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    thread::{self, JoinHandle},
+    thread::{self},
     time::{self, Duration},
 };
 
@@ -13,15 +14,19 @@ use tracing::{error, trace};
 use wayland_client::{
     backend::{protocol, Backend, ObjectData, ObjectId},
     globals::{registry_queue_init, GlobalList, GlobalListContents},
-    protocol::{wl_display, wl_registry},
+    protocol::{
+        wl_display,
+        wl_registry::{self},
+    },
     Connection, Dispatch, EventQueue, Proxy, QueueHandle,
 };
 
 use crate::wlr_client::errors::ClientError;
 
+#[derive(Clone)]
 pub(super) struct ConnectionManager {
     connection: Connection,
-    globals: GlobalList,
+    globals: Rc<GlobalList>,
     bound_interfaces: Vec<String>,
 }
 
@@ -54,7 +59,7 @@ impl ConnectionManager {
 
         Ok(ConnectionManager {
             connection,
-            globals,
+            globals: Rc::new(globals),
             bound_interfaces: Vec::default(),
         })
     }
@@ -71,13 +76,15 @@ impl ConnectionManager {
             })?;
         conn.flush()?;
 
-        let end = time::SystemTime::now()
+        let end = time::Instant::now()
             .checked_add(Duration::from_secs(3))
             .expect("Should not happen");
         loop {
-            if end <= time::SystemTime::now() {
+            if end <= time::Instant::now() {
                 error!("Timeout while syncing");
-                break;
+                return Err(ClientError::Dispatch {
+                    msg: String::from("Failed to sync with wayland server."),
+                });
             }
             // see if the successful read included our callback
             if done.done.load(Ordering::Relaxed) {
@@ -91,6 +98,50 @@ impl ConnectionManager {
 
     pub(super) fn new_queue<State>(&self) -> EventQueue<State> {
         self.connection.new_event_queue()
+    }
+
+    pub(super) fn bind_all_globals<Iface, State, UData>(
+        &mut self,
+        queue_handle: &QueueHandle<State>,
+        version: RangeInclusive<u32>,
+        udata: UData,
+    ) -> Result<Vec<Iface>, ClientError>
+    where
+        Iface: Proxy + 'static,
+        State: Dispatch<Iface, UData> + 'static,
+        UData: Clone + Send + Sync + 'static,
+    {
+        let version_start = *version.start();
+        let version_end = *version.end();
+        let interface = Iface::interface();
+
+        // This is a panic because it's a compile-time programmer error, not a runtime error.
+        assert!(version_end <= interface.version, "Maximum version ({}) of {} was higher than the proxy's maximum version ({}); outdated wayland XML files?",
+                version.end(), interface.name, interface.version);
+
+        let ifaces: Vec<(u32, u32)> = self.globals.contents().with_list(|guard| {
+            guard
+                .iter()
+                .filter(|i| interface.name == &i.interface[..])
+                .map(|i| (i.name, i.version))
+                .collect()
+        });
+
+        let mut objects = Vec::new();
+        for i in ifaces {
+            if version_start < i.1 {
+                return Err(ClientError::Binding {
+                    msg: String::from("Min version constraint is not met"),
+                });
+            }
+            objects.push(
+                self.globals
+                    .registry()
+                    .bind(i.0, i.1, queue_handle, udata.clone()),
+            );
+        }
+
+        Ok(objects)
     }
 
     pub(super) fn bind_global<Iface, State, UData>(

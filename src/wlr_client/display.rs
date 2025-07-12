@@ -1,9 +1,12 @@
+use std::collections::HashMap;
 use std::os::fd::AsFd;
-use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
+use std::sync::{Arc, RwLock};
+use std::thread;
 use std::time::Duration;
 
-use tracing::{error, trace};
-use wayland_client::WEnum;
+use tracing::{debug, error, trace};
+use wayland_client::backend::ObjectId;
+use wayland_client::protocol::wl_output::{self, WlOutput};
 use wayland_client::{
     protocol::{
         wl_buffer::WlBuffer,
@@ -14,125 +17,291 @@ use wayland_client::{
     },
     Connection, Dispatch, EventQueue, QueueHandle,
 };
-use wayland_protocols::xdg::shell::client::xdg_wm_base;
+use wayland_client::{Proxy, WEnum};
+use wayland_protocols::xdg::shell::client::{xdg_toplevel, xdg_wm_base};
 
 use fontdue::{Font, FontSettings};
-use wayland_protocols::xdg::shell::client::{xdg_surface::{self, XdgSurface}, xdg_toplevel::XdgToplevel, xdg_wm_base::XdgWmBase};
+use wayland_protocols::xdg::shell::client::{
+    xdg_surface::{self, XdgSurface},
+    xdg_toplevel::XdgToplevel,
+    xdg_wm_base::XdgWmBase,
+};
 
-use crate::wlr_client::ConnectionManager;
 use crate::wlr_client::errors::ClientError;
 use crate::wlr_client::shmem::Shmem;
+use crate::wlr_client::wlr_head::OutputHead;
+use crate::wlr_client::ConnectionManager;
 
+#[derive(Debug, PartialEq)]
 enum State {
+    /// Nothing to draw.
     Wait,
+    /// frame buffer is all set and ready to go.
     Ready,
+    /// frame buffer committed to the compositor.
+    Committed,
+    /// frame buffer is displayed and is desposed by the compositor already. Could be re-used at
+    /// this state.
+    Active,
 }
 
+// We need to wrap the state in our own type to be able to impl alien traits.
+struct StateWrapper {
+    state: AsyncState,
+}
+
+struct DisplayState {
+    format: Option<wl_shm::Format>,
+    surfaces: Vec<Surface>,
+    outputs_map: HashMap<String, ObjectId>,
+    outputs: Vec<WlOutput>,
+}
+
+#[allow(clippy::struct_field_names)]
+struct Surface {
+    wl_surface: WlSurface,
+    wl_buff: WlBuffer,
+    xdg_surface: XdgSurface,
+    xdg_toplevel: XdgToplevel,
+    state: State,
+    output: Option<WlOutput>,
+    transform: Option<WEnum<wl_output::Transform>>,
+}
+
+impl Drop for Surface {
+    fn drop(&mut self) {
+        self.xdg_toplevel.destroy();
+        self.xdg_surface.destroy();
+        self.wl_surface.destroy();
+        self.wl_buff.destroy();
+    }
+}
+
+type AsyncState = Arc<RwLock<DisplayState>>;
+
 pub struct DisplayServer {
+    queue_handle: QueueHandle<StateWrapper>,
     sh_mem: Shmem,
     wl_shm: WlShm,
     wl_pool: WlShmPool,
-    wl_buff: WlBuffer,
-    wl_surface: WlSurface,
-    state: State,
-    sender: Sender<State>,
-    receiver: Receiver<State>,
-    pixel_format: Option<wl_shm::Format>,
+    wl_compositor: WlCompositor,
+    xdg_wm_base: XdgWmBase,
+    state: AsyncState,
 }
 
 // We are assuming color format ARGB8888
-const STRIDE: usize = 4; //bytes
+const PIXEL_SIZE: usize = 4; //bytes
+const FONT_SIZE: f32 = 128.0;
+const BACKGROUND: u8 = 128;
+const BORDER_SIZE: usize = 25;
 
 impl DisplayServer {
-    pub(super) fn start(
-        conn_man: &mut ConnectionManager,
-    ) -> Result<Self, ClientError> {
-
-        let mut queue: EventQueue<DisplayServer> = conn_man.new_queue();
+    pub(super) fn start(conn_man: &mut ConnectionManager) -> Result<Self, ClientError> {
+        let mut queue: EventQueue<StateWrapper> = conn_man.new_queue();
         let queue_handle = queue.handle();
         let wl_shm: WlShm = conn_man.bind_global(&queue_handle, 2..=2, ())?;
         let wl_compositor: WlCompositor = conn_man.bind_global(&queue_handle, 6..=6, ())?;
         let xdg_wm_base: XdgWmBase = conn_man.bind_global(&queue_handle, 5..=5, ())?;
 
-        let (size, width, height) = estimate_shmem_size();
-        let sh_mem: Shmem = Shmem::create(size).unwrap();
-        let size = i32::try_from(size).unwrap();
+        let wl_outputs: Vec<WlOutput> = conn_man.bind_all_globals(&queue_handle, 4..=4, ())?;
+
+        let (buff, ..) = rasterize_txt("HDMI-2HDMI-2");
+        debug!("Estemated display buffer: size: {}", buff.len());
+        let sh_mem: Shmem = Shmem::create(buff.len()).unwrap();
+        let size = i32::try_from(buff.len()).unwrap();
         let wl_pool: WlShmPool = wl_shm.create_pool(sh_mem.fd.as_fd(), size, &queue_handle, ());
-        let wl_buff = wl_pool.create_buffer(
-            0,
-            i32::try_from(width).unwrap(),
-            i32::try_from(height).unwrap(),
-            i32::try_from(STRIDE).unwrap(),
-            Format::Argb8888,
-            &queue_handle,
-            (),
-        );
-        let wl_surface = wl_compositor.create_surface(&queue_handle, ());
-        let xdg_surface = xdg_wm_base.get_xdg_surface(&wl_surface, &queue_handle, ());
-        let _xdg_toplevel = xdg_surface.get_toplevel(&queue_handle, ());
 
-        let (sender, receiver) = channel();
+        let display_state = Arc::new(RwLock::new(DisplayState {
+            format: None,
+            surfaces: Vec::default(),
+            outputs_map: HashMap::default(),
+            outputs: wl_outputs,
+        }));
 
-        let mut display_server = DisplayServer {
-                    sh_mem,
-                    wl_shm,
-                    wl_pool,
-                    wl_buff,
-                    wl_surface,
-                    state: State::Wait,
-                    sender,
-                    receiver,
-                    pixel_format: None,
-                };
+        // let's sync with the server and dispatch all pending events after. This will make sure
+        // we got the supported pixel formats.
         conn_man.sync()?;
-        trace!("all is configured for display server");
+        queue.dispatch_pending(&mut StateWrapper {
+            state: display_state.clone(),
+        })?;
 
-        assert_eq!(display_server.pixel_format, Some(Format::Argb8888));
+        thread::spawn({
+            let mut state = StateWrapper {
+                state: display_state.clone(),
+            };
+
+            move || loop {
+                // no need to pull more than the 60 Hz refresh rate.
+                // specially that what we draw is static in nature
+                thread::sleep(Duration::from_millis(16));
+
+                // flushing all out going requests, if any
+                if let Err(err) = queue.flush() {
+                    error!("Failed to flush out going events: {}", err);
+                }
+
+                if let Err(err) = queue.dispatch_pending(&mut state) {
+                    error!("Error dispatching events: {}", err);
+                }
+            }
+        });
+
+        let display_server = DisplayServer {
+            queue_handle,
+            sh_mem,
+            wl_shm,
+            wl_pool,
+            wl_compositor,
+            xdg_wm_base,
+            state: display_state,
+        };
+        debug!("all is configured for display server");
 
         Ok(display_server)
     }
 
-    pub(crate) fn write(&self, text: &str) -> Result<(), String> {
-        let (buff, ..) = rasterize_txt(text);
+
+    pub(crate) fn write(
+        &mut self,
+        text: &str,
+        output_head: Option<&OutputHead>,
+    ) -> Result<(), ClientError> {
+        let (buff, width, height) = rasterize_txt(text);
         if buff.len() > self.sh_mem.size {
-            return Err(String::from("Pixel buffer is bigger than the display buffer"));
+            error!(
+                "Display buffer of size '{}' is too small for pixel buffer",
+                self.sh_mem.size
+            );
+            return Err(ClientError::Display {
+                msg: String::from("Pixel buffer is bigger than the display buffer"),
+            });
+        }
+        debug!(
+            "Pixel buffer size: {}, w:{}, h:{}",
+            buff.len(),
+            width,
+            height
+        );
+
+        let mut stored_surface = None;
+        let mut rw_lock = self.state.write().unwrap();
+        if let Some(o) = output_head.as_ref() {
+            if let Some(wl_output) = rw_lock.wl_output_from_output_head(o) {
+                for s in &mut rw_lock.surfaces {
+                    if let Some(so) = s.output.as_ref() {
+                        if so.id() == wl_output.id() {
+                            stored_surface = Some(s);
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
-        match self.receiver.recv_timeout(Duration::from_secs(10)) {
-            Ok(State::Ready) => {
-                unsafe {
-                    std::ptr::copy(buff.as_ptr(), self.sh_mem.addr, buff.len());
+        if let Some(s) = stored_surface {
+            unsafe {
+                std::ptr::copy(buff.as_ptr(), self.sh_mem.addr, buff.len());
+            };
+            s.state = State::Ready;
+            drop(rw_lock);
+        } else {
+            drop(rw_lock);
+            let mut wl_output = None;
+            if let Some(oh) = output_head.as_ref() {
+                wl_output = match self.state.read().unwrap().wl_output_from_output_head(oh) {
+                    Some(o) => Some(o),
+                    None => {
+                        return Err(ClientError::Display {
+                            msg: String::from("Could not find specified output"),
+                        })
+                    }
                 };
-                self.wl_surface.attach(Some(&self.wl_buff), 0, 0);
-                self.wl_surface.damage(0, 0, i32::MAX, i32::MAX);
-                self.wl_surface.commit();
-                Ok(())
-            },
-            Ok(State::Wait) => {
-                error!("State did not change to Ready!");
-                Err("Could not ack_configure!")? },
-            Err(RecvTimeoutError::Timeout) => {
-                error!("Timedout before receiving configure event.");
-                Err("Failed to recieve state message.")?
-            },
-            Err(RecvTimeoutError::Disconnected) => {
-                error!("Failed to receive state message.");
-                Err("Failed to recieve state message.")?
-            },
-        }
+                if let Some(o) = self.state.read().unwrap().wl_output_from_output_head(oh) {
+                    wl_output = Some(o);
+                }
+            }
+            let wl_buff = self.wl_pool.create_buffer(
+                0,
+                i32::try_from(width).unwrap(),
+                i32::try_from(height).unwrap(),
+                i32::try_from(width.saturating_mul(PIXEL_SIZE)).unwrap(),
+                Format::Argb8888,
+                &self.queue_handle,
+                (),
+            );
+
+            let wl_surface = self.wl_compositor.create_surface(&self.queue_handle, ());
+            let xdg_surface = self
+                .xdg_wm_base
+                .get_xdg_surface(&wl_surface, &self.queue_handle, ());
+            let xdg_toplevel = xdg_surface.get_toplevel(&self.queue_handle, ());
+            // We need to do a commit after asiging a role, then we will get the configure event.
+            wl_surface.commit();
+            xdg_toplevel.set_fullscreen(wl_output.as_ref());
+
+            let mut surface = Surface {
+                wl_surface,
+                wl_buff,
+                xdg_surface,
+                xdg_toplevel,
+                state: State::Wait,
+                output: wl_output,
+                transform: None,
+            };
+            unsafe {
+                std::ptr::copy(buff.as_ptr(), self.sh_mem.addr, buff.len());
+            };
+            surface.state = State::Ready;
+            self.state.write().unwrap().surfaces.push(surface);
+        };
+
+        Ok(())
     }
 }
 
 impl Drop for DisplayServer {
     fn drop(&mut self) {
-        self.wl_surface.destroy();
-        self.wl_buff.destroy();
         self.wl_pool.destroy();
         self.wl_shm.release();
     }
 }
 
-impl Dispatch<XdgWmBase, ()> for DisplayServer {
+impl DisplayState {
+    fn wl_output_from_output_head(&self, output_head: &OutputHead) -> Option<WlOutput> {
+        let mut result = None;
+        if let Some(object_id) = self.outputs_map.get(output_head.name()) {
+            for output in &self.outputs {
+                if output.id() == *object_id {
+                    result = Some(output.clone());
+                    break;
+                }
+            }
+        }
+        result
+    }
+}
+
+impl Dispatch<WlOutput, ()> for StateWrapper {
+    fn event(
+        state: &mut Self,
+        proxy: &WlOutput,
+        event: <WlOutput as Proxy>::Event,
+        _data: &(),
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        if let wl_output::Event::Name { name } = event {
+            state
+                .state
+                .write()
+                .unwrap()
+                .outputs_map
+                .insert(name, proxy.id());
+        }
+    }
+}
+
+impl Dispatch<XdgWmBase, ()> for StateWrapper {
     fn event(
         _state: &mut Self,
         proxy: &XdgWmBase,
@@ -142,12 +311,13 @@ impl Dispatch<XdgWmBase, ()> for DisplayServer {
         _qhandle: &QueueHandle<Self>,
     ) {
         if let xdg_wm_base::Event::Ping { serial } = event {
+            trace!("pong({})", serial);
             proxy.pong(serial);
         }
     }
 }
 
-impl Dispatch<WlShm, ()> for DisplayServer {
+impl Dispatch<WlShm, ()> for StateWrapper {
     fn event(
         state: &mut Self,
         _proxy: &WlShm,
@@ -162,13 +332,13 @@ impl Dispatch<WlShm, ()> for DisplayServer {
             format: WEnum::Value(Format::Argb8888),
         } = event
         {
-            state.pixel_format = Some(Format::Argb8888);
-            trace!("pixel format 'ARGB8888' is supported");
+            state.state.write().unwrap().format = Some(Format::Argb8888);
+            debug!("pixel format 'ARGB8888' is supported");
         }
     }
 }
 
-impl Dispatch<WlCompositor, ()> for DisplayServer {
+impl Dispatch<WlCompositor, ()> for StateWrapper {
     fn event(
         _state: &mut Self,
         _proxy: &WlCompositor,
@@ -177,10 +347,13 @@ impl Dispatch<WlCompositor, ()> for DisplayServer {
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
+        // match _event {
+        //     _ => todo!(),
+        // }
     }
 }
 
-impl Dispatch<WlShmPool, ()> for DisplayServer {
+impl Dispatch<WlShmPool, ()> for StateWrapper {
     fn event(
         _state: &mut Self,
         _proxy: &WlShmPool,
@@ -189,13 +362,15 @@ impl Dispatch<WlShmPool, ()> for DisplayServer {
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        todo!()
+        //match _event {
+        //    _ => todo!(),
+        //}
     }
 }
 
-impl Dispatch<WlBuffer, ()> for DisplayServer {
+impl Dispatch<WlBuffer, ()> for StateWrapper {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         wl_buff: &WlBuffer,
         event: <WlBuffer as wayland_client::Proxy>::Event,
         _data: &(),
@@ -203,32 +378,45 @@ impl Dispatch<WlBuffer, ()> for DisplayServer {
         _qhandle: &QueueHandle<Self>,
     ) {
         if let wayland_client::protocol::wl_buffer::Event::Release = event {
-            wl_buff.destroy();
+            debug!("buffer released by compositor");
+            for surface in &mut state.state.write().unwrap().surfaces {
+                if surface.wl_buff.id() == wl_buff.id() {
+                    surface.state = State::Active;
+                    debug!("surface {} is active", surface.wl_surface.id());
+                    break;
+                }
+            }
         }
     }
 }
 
-impl Dispatch<WlSurface, ()> for DisplayServer {
+impl Dispatch<WlSurface, ()> for StateWrapper {
     fn event(
-        _state: &mut Self,
-        _proxy: &WlSurface,
-        _event: <WlSurface as wayland_client::Proxy>::Event,
+        state: &mut Self,
+        proxy: &WlSurface,
+        event: <WlSurface as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        // match event {
-        //     wayland_client::protocol::wl_surface::Event::Enter { output } => {}
-        //     wayland_client::protocol::wl_surface::Event::Leave { output } => {}
-        //     wayland_client::protocol::wl_surface::Event::PreferredBufferScale { factor } => {}
-        //     wayland_client::protocol::wl_surface::Event::PreferredBufferTransform { transform } => {
-        //     }
-        //     _ => {}
-        // }
+        match event {
+            // wayland_client::protocol::wl_surface::Event::Enter { output } => {}
+            // wayland_client::protocol::wl_surface::Event::Leave { output } => {}
+            // wayland_client::protocol::wl_surface::Event::PreferredBufferScale { factor } => {}
+            wayland_client::protocol::wl_surface::Event::PreferredBufferTransform { transform } => {
+                for surface in &mut state.state.write().unwrap().surfaces {
+                    if surface.wl_surface.id() == proxy.id() {
+                        surface.transform = Some(transform);
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
-impl Dispatch<XdgSurface, ()> for DisplayServer {
+impl Dispatch<XdgSurface, ()> for StateWrapper {
     fn event(
         state: &mut Self,
         proxy: &XdgSurface,
@@ -238,31 +426,49 @@ impl Dispatch<XdgSurface, ()> for DisplayServer {
         _qhandle: &QueueHandle<Self>,
     ) {
         if let xdg_surface::Event::Configure { serial } = event {
+            debug!("received configure event on xdg_surface");
             proxy.ack_configure(serial);
-            state.state = State::Ready;
-            if let Err(err) = state.sender.send(State::Ready) {
-                error!("Failed to send the state message. {}", err);
+            for surface in &mut state.state.write().unwrap().surfaces {
+                if surface.xdg_surface.id() == proxy.id() && surface.state == State::Ready {
+                    surface.wl_surface.attach(Some(&surface.wl_buff), 0, 0);
+                    surface.wl_surface.commit();
+                    surface.state = State::Committed;
+                    break;
+                }
             }
         }
     }
 }
 
-impl Dispatch<XdgToplevel, ()> for DisplayServer {
+impl Dispatch<XdgToplevel, ()> for StateWrapper {
     fn event(
         _state: &mut Self,
         _proxy: &XdgToplevel,
-        _event: <XdgToplevel as wayland_client::Proxy>::Event,
+        event: <XdgToplevel as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        // match event {
-        //     xdg_toplevel::Event::Configure { width, height, states } => todo!(),
-        //     xdg_toplevel::Event::Close => todo!(),
-        //     xdg_toplevel::Event::ConfigureBounds { width, height } => todo!(),
-        //     xdg_toplevel::Event::WmCapabilities { capabilities } => todo!(),
-        //     _ => todo!(),
-        // }
+        match event {
+            xdg_toplevel::Event::Configure {
+                width,
+                height,
+                states,
+            } => {
+                debug!(
+                    "xdg_top_level::configure({}, {}, {:?})",
+                    width, height, states
+                );
+            }
+            //xdg_toplevel::Event::Close => {}
+            xdg_toplevel::Event::ConfigureBounds { width, height } => {
+                debug!("xdg_top_level::configure_bounds({}, {})", width, height);
+            }
+            xdg_toplevel::Event::WmCapabilities { capabilities } => {
+                debug!("xdg_top_level::wm_capabilities({:?})", capabilities);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -271,56 +477,74 @@ fn rasterize_txt(txt: &str) -> (Vec<u8>, usize, usize) {
     let font = Font::from_bytes(
         font_data,
         FontSettings {
-            scale: 360.0,
+            scale: FONT_SIZE,
             ..Default::default()
         },
     )
     .unwrap();
 
-    let mut px_h: usize = 0;
-    let mut px_w: usize = 0;
-
     #[allow(
         clippy::cast_sign_loss,
         clippy::cast_possible_truncation,
         clippy::as_conversions
     )]
-    for c in txt.chars() {
-        let (metrics, _) = font.rasterize(c, 360.0);
-        px_h = px_h.max(metrics.height);
-        px_w = px_w.saturating_add(metrics.advance_width.abs().ceil() as usize);
+    let (txt_w, txt_h) = {
+        let mut txt_h: usize = 0;
+        let mut txt_w: usize = 0;
+        for (i, c) in txt.chars().enumerate() {
+            let (metrics, _) = font.rasterize(c, FONT_SIZE);
+            txt_h = txt_h.max(metrics.height);
+            let advance = if i < txt.len().saturating_sub(1) {
+                metrics.advance_width.abs().ceil() as usize
+            } else {
+                metrics.width
+            };
+            txt_w = txt_w.saturating_add(advance);
+        }
+        (txt_w, txt_h)
+    };
+
+    let px_w = txt_w.saturating_add(BORDER_SIZE.saturating_mul(2));
+    let px_h = txt_h.saturating_add(BORDER_SIZE.saturating_mul(2));
+    let mut px_buff: Vec<u8> =
+        vec![BACKGROUND; px_w.saturating_mul(px_h).saturating_mul(PIXEL_SIZE)];
+    //ensures that all pixels are opaque
+    for px in px_buff.chunks_exact_mut(4) {
+        px[3] = 255;
     }
 
-    let mut px_buff: Vec<u8> = vec![
-        0u8;
-        px_w.saturating_mul(px_h)
-            .saturating_mul(px_w)
-            .saturating_mul(STRIDE)
-    ];
+    let mut x_offset = BORDER_SIZE;
+    let y_offset = BORDER_SIZE;
 
-    let mut x_offset = 0;
     #[allow(
         clippy::cast_sign_loss,
         clippy::cast_possible_truncation,
         clippy::as_conversions
     )]
     for c in txt.chars() {
-        let (metrics, buff) = font.rasterize(c, 360.0);
+        let (metrics, buff) = font.rasterize(c, FONT_SIZE);
         let ymin = usize::try_from(0.max(metrics.ymin)).unwrap();
         for y in 0..metrics.height {
             for x in 0..metrics.width {
                 let src_idx = y.saturating_mul(metrics.width).saturating_add(x);
                 let dst_idx = y
-                    .saturating_add(px_h.saturating_sub(metrics.height).saturating_sub(ymin))
+                    .saturating_add(
+                        px_h.saturating_sub(metrics.height)
+                            .saturating_sub(ymin)
+                            .saturating_sub(y_offset),
+                    )
                     .saturating_mul(px_w)
                     .saturating_add(x_offset)
                     .saturating_add(x)
-                    .saturating_mul(STRIDE);
+                    .saturating_mul(PIXEL_SIZE);
                 let grayscale = buff[src_idx];
-                px_buff[dst_idx] = grayscale; // A
-                px_buff[dst_idx.saturating_add(1)] = 0; // R
-                px_buff[dst_idx.saturating_add(2)] = 0; // G
-                px_buff[dst_idx.saturating_add(3)] = 0; // B
+                // blinding with the background color.
+                let px_color = f32::from(BACKGROUND) * (1.0 - (f32::from(grayscale) / 255.0));
+                let px_color = px_color.ceil() as u8;
+                px_buff[dst_idx] = px_color; // B
+                px_buff[dst_idx.saturating_add(1)] = px_color; // G
+                px_buff[dst_idx.saturating_add(2)] = px_color; // R
+                px_buff[dst_idx.saturating_add(3)] = 255; // A
             }
         }
         x_offset = x_offset.saturating_add(metrics.advance_width.abs().ceil() as usize);
@@ -329,38 +553,22 @@ fn rasterize_txt(txt: &str) -> (Vec<u8>, usize, usize) {
     (px_buff, px_w, px_h)
 }
 
-fn estimate_shmem_size() -> (usize, usize, usize) {
-    let (w, h) = {
-        let font_data: &[u8] = include_bytes!("DejaVuSans-Bold.ttf");
-        let font = Font::from_bytes(
-            font_data,
-            FontSettings {
-                scale: 360.0,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        let mut h: usize = 0;
-        let mut w: usize = 0;
-        for c in "HDMI-2".chars() {
-            let (metrics, _) = font.rasterize(c, 360.0);
-            h = if metrics.height > h {
-                metrics.height
-            } else {
-                h
-            };
-            w = w.saturating_add(metrics.width);
-        }
-        (w, h)
-    };
-    (h.saturating_mul(w).saturating_mul(STRIDE), w, h)
-}
-
 #[cfg(test)]
 mod tests {
+    use image::{ImageBuffer, RgbaImage};
+
+    use crate::wlr_client::display::rasterize_txt;
+
     #[test]
-    fn estimate_buffer_size() {
-        let (size, _, _) = super::estimate_shmem_size();
-        assert_eq!(1_230_656, size);
+    #[allow(clippy::as_conversions, clippy::cast_possible_truncation)]
+    fn rasterizing_txt() {
+        let (buff, w, h) = rasterize_txt("HDMI-2");
+        let mut rgba_buff = Vec::new();
+        for pixel in buff.chunks_exact(4) {
+            rgba_buff.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
+        }
+        let img: RgbaImage =
+            ImageBuffer::from_raw(w as u32, h as u32, rgba_buff).expect("don't fail");
+        let _ = img.save("target/test_img.png");
     }
 }

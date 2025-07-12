@@ -33,9 +33,13 @@ impl Shmem {
         let seals = F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
         unsafe {
             let debug_name = DEBUG_NAME.as_ptr().cast::<c_char>();
-            let fd = memfd_create(debug_name, flags);
+            let mut fd = memfd_create(debug_name, flags);
             if fd < 0 {
-                return Err(io::Error::from(errno()));
+                // MFD_NOEXEC_SEAL is not always supported. If we fail, remove it and retry
+                fd = memfd_create(debug_name, flags & (!MFD_NOEXEC_SEAL));
+                if fd < 0 {
+                    return Err(io::Error::from(errno()));
+                }
             }
             let res = ftruncate64(fd, size.try_into().expect("buffer size is invalid"));
             if res < 0 {

@@ -8,13 +8,11 @@ use wayland_client::{backend::ObjectId, Proxy};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_head_v1::ZwlrOutputHeadV1, zwlr_output_mode_v1::ZwlrOutputModeV1,
 };
-use wayland_client::protocol::wl_shm::Format;
 
 #[derive(Default)]
 pub struct Configurations {
     heads: HashMap<ObjectId, OutputHead>,
     modes: HashMap<ObjectId, OutputMode>,
-    pixel_format: Option<Format>,
     serial: u32,
 }
 
@@ -59,9 +57,7 @@ impl Configurations {
         self.serial = serial;
     }
 
-    pub fn set_pixel_format(&mut self, format: Format) {
-        self.pixel_format = Some(format);
-    }
+
 
     pub fn get_head_mut(&mut self, id: &ObjectId) -> Option<&mut OutputHead> {
         self.heads.get_mut(id)
@@ -83,7 +79,5 @@ impl Configurations {
         self.serial
     }
 
-    pub(crate) fn pixel_format(&self) -> Option<Format> {
-        self.pixel_format
-    }
+
 }

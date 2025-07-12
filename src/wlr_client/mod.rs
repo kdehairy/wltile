@@ -6,8 +6,6 @@ pub mod errors;
 mod output_manager;
 pub mod point;
 pub mod shmem;
-mod wl_compositor;
-mod wl_shm;
 pub mod wlr_head;
 pub mod wlr_mode;
 
@@ -17,10 +15,10 @@ use display::DisplayServer;
 use errors::ClientError;
 use tracing::{debug, trace};
 
+use wayland_client::EventQueue;
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
 use crate::wlr_client::connection_manager::ConnectionManager;
-use crate::wlr_client::point::Point;
 
 /// wlroots client that handles communication with the compositor.
 ///
@@ -36,7 +34,7 @@ impl Client {
     /// Connects to the wlroots compositor and receive the outputs configurations.
     pub fn new() -> Result<Client, ClientError> {
         let mut conn_man = ConnectionManager::connect()?;
-        let mut queue = conn_man.new_queue();
+        let mut queue: EventQueue<Configurations> = conn_man.new_queue();
         let queue_handle = queue.handle();
 
         let mut configurations = Configurations::default();
@@ -72,26 +70,20 @@ impl Client {
         config_writer.write(update_request, &self.output_manager)
     }
 
-    pub fn render_text(&mut self, text: &str, position: Point) -> Result<(), ClientError> {
-        trace!(
-            "received text '{}' to render at position {}",
-            text,
-            position
-        );
-
+    pub fn get_display_server(&mut self) -> Result<&mut DisplayServer, ClientError> {
         if self.display_server.is_none() {
             let display_server = DisplayServer::start(&mut self.connection_manager)?;
             self.display_server = Some(display_server);
         }
 
-        let display_server = self.display_server.as_ref().expect("Should not happen");
+        Ok(self.display_server.as_mut().expect("Should not happen"))
 
-        if let Err(err) = display_server.write(text) {
-            return Err(ClientError::Display {
-                msg: format!("failed to render text. {err}"),
-            });
-        };
-        Ok(())
+        // if let Err(err) = display_server.write(text, head) {
+        //     return Err(ClientError::Display {
+        //         msg: format!("failed to render text: {err}"),
+        //     });
+        // }
+        // Ok(())
     }
 }
 
