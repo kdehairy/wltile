@@ -7,6 +7,7 @@ use std::time::Duration;
 use tracing::{debug, error, trace};
 use wayland_client::backend::ObjectId;
 use wayland_client::protocol::wl_output::{self, WlOutput};
+use wayland_client::protocol::wl_surface;
 use wayland_client::{
     protocol::{
         wl_buffer::WlBuffer,
@@ -160,7 +161,6 @@ impl DisplayServer {
         Ok(display_server)
     }
 
-
     pub(crate) fn write(
         &mut self,
         text: &str,
@@ -253,7 +253,7 @@ impl DisplayServer {
             };
             surface.state = State::Ready;
             self.state.write().unwrap().surfaces.push(surface);
-        };
+        }
 
         Ok(())
     }
@@ -399,19 +399,13 @@ impl Dispatch<WlSurface, ()> for StateWrapper {
         _conn: &Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        match event {
-            // wayland_client::protocol::wl_surface::Event::Enter { output } => {}
-            // wayland_client::protocol::wl_surface::Event::Leave { output } => {}
-            // wayland_client::protocol::wl_surface::Event::PreferredBufferScale { factor } => {}
-            wayland_client::protocol::wl_surface::Event::PreferredBufferTransform { transform } => {
-                for surface in &mut state.state.write().unwrap().surfaces {
-                    if surface.wl_surface.id() == proxy.id() {
-                        surface.transform = Some(transform);
-                        break;
-                    }
+        if let wl_surface::Event::PreferredBufferTransform { transform } = event {
+            for surface in &mut state.state.write().unwrap().surfaces {
+                if surface.wl_surface.id() == proxy.id() {
+                    surface.transform = Some(transform);
+                    break;
                 }
             }
-            _ => {}
         }
     }
 }
