@@ -24,7 +24,7 @@ use wayland_client::{
 use crate::wlr_client::errors::ClientError;
 
 #[derive(Clone)]
-pub(super) struct ConnectionManager {
+pub(crate) struct ConnectionManager {
     connection: Connection,
     globals: Rc<GlobalList>,
     bound_interfaces: Vec<String>,

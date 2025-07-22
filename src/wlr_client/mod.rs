@@ -3,15 +3,18 @@ pub mod configs;
 mod connection_manager;
 pub mod display;
 pub mod errors;
-mod output_manager;
 pub mod point;
 pub mod shmem;
 pub mod wlr_head;
 pub mod wlr_mode;
 
+mod output_manager;
+mod input;
+
 use config_writer::{ConfigWriter, UpdateRequest};
 use configs::Configurations;
 use display::DisplayServer;
+use input::InputServer;
 use errors::ClientError;
 use tracing::{debug, trace};
 
@@ -28,6 +31,7 @@ pub struct Client {
     output_manager: ZwlrOutputManagerV1,
     connection_manager: ConnectionManager,
     display_server: Option<DisplayServer>,
+    input_server: Option<InputServer>,
 }
 
 impl Client {
@@ -44,9 +48,6 @@ impl Client {
         queue.dispatch_pending(&mut configurations)?;
         debug!("configurations received");
 
-        // let display_server = DisplayServer::start(
-        //     &mut conn_man,
-        // )?;
 
         trace!("started display server");
 
@@ -55,6 +56,7 @@ impl Client {
             output_manager,
             connection_manager: conn_man,
             display_server: None,
+            input_server: None,
         })
     }
 
@@ -63,14 +65,14 @@ impl Client {
     }
 
     /// Updates the outputs configurations to match the provided request.
-    pub fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
+    pub(crate) fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
         trace!("received update request: {update_request}");
         let mut config_writer: ConfigWriter =
             config_writer::ConfigWriter::new(&self.connection_manager);
         config_writer.write(update_request, &self.output_manager)
     }
 
-    pub fn get_display_server(&mut self) -> Result<&mut DisplayServer, ClientError> {
+    pub(crate) fn get_display_server(&mut self) -> Result<&mut DisplayServer, ClientError> {
         if self.display_server.is_none() {
             let display_server = DisplayServer::start(&mut self.connection_manager)?;
             self.display_server = Some(display_server);
@@ -84,6 +86,15 @@ impl Client {
         //     });
         // }
         // Ok(())
+    }
+
+    pub(crate) fn get_input_server(&mut self) -> Result<&mut InputServer, ClientError> {
+        if self.input_server.is_none() {
+            let input_server = InputServer::start(&mut self.connection_manager)?;
+            self.input_server = Some(input_server);
+        }
+
+        Ok(self.input_server.as_mut().expect("Should not happen"))
     }
 }
 
