@@ -1,18 +1,14 @@
-pub mod config_writer;
-pub mod configs;
 mod connection_manager;
 pub mod display;
 pub mod errors;
 pub mod point;
 pub mod shmem;
-pub mod wlr_head;
-pub mod wlr_mode;
 
-mod output_manager;
-mod input;
+pub(crate) mod output;
+pub(crate) mod input;
 
-use config_writer::{ConfigWriter, UpdateRequest};
-use configs::Configurations;
+use output::config_writer::{ConfigWriter, UpdateRequest};
+use output::configs::Configurations;
 use display::DisplayServer;
 use input::InputServer;
 use errors::ClientError;
@@ -22,6 +18,7 @@ use wayland_client::EventQueue;
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
 use crate::wlr_client::connection_manager::ConnectionManager;
+use crate::wlr_client::output::config_writer;
 
 /// wlroots client that handles communication with the compositor.
 ///

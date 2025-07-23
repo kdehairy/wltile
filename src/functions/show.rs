@@ -1,5 +1,5 @@
 
-use crate::wlr_client::{self, errors::ClientError, wlr_head::OutputHead};
+use crate::wlr_client::{self, errors::ClientError, output::wlr_head::OutputHead};
 
 #[allow(clippy::print_stdout)]
 pub(crate) fn exec(client: &mut wlr_client::Client) -> Result<(), ClientError> {

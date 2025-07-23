@@ -6,7 +6,7 @@ use crate::{
     heads::Head,
     wlr_client::{
         self,
-        config_writer::{HeadUpdateRequest, UpdateRequest},
+        output::config_writer::{HeadUpdateRequest, UpdateRequest},
         point::Point,
     },
 };

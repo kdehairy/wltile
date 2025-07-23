@@ -2,8 +2,8 @@ use crate::{
     heads::Head,
     wlr_client::{
         self,
-        config_writer::{HeadUpdateRequest, UpdateRequest},
-        wlr_mode::OutputMode,
+        output::config_writer::{HeadUpdateRequest, UpdateRequest},
+        output::wlr_mode::OutputMode,
     },
 };
 

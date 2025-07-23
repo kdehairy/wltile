@@ -14,7 +14,7 @@ use wayland_protocols_wlr::output_management::v1::client::{
 use crate::commons::{ToString, TryFrom};
 
 use super::configs::Configurations;
-use super::point::Point;
+use crate::wlr_client::point::Point;
 
 impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
     fn event(

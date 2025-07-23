@@ -17,7 +17,8 @@ use wayland_protocols_wlr::output_management::v1::client::{
 use crate::commons::ToString;
 use crate::wlr_client::ConnectionManager;
 
-use super::{point::Point, wlr_head::OutputHead};
+use crate::wlr_client::point::Point;
+use super::wlr_head::OutputHead;
 
 impl Dispatch<ZwlrOutputConfigurationV1, ()> for State {
     fn event(
@@ -125,7 +126,7 @@ pub struct ConfigWriter {
 }
 
 impl ConfigWriter {
-    pub(super) fn new(conn_man: &ConnectionManager) -> Self {
+    pub(crate) fn new(conn_man: &ConnectionManager) -> Self {
         let queue = conn_man.new_queue();
         trace!("configurations writer queue created successfully");
         let (sender, receiver) = channel();

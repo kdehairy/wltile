@@ -3,7 +3,7 @@ use std::ops::Div;
 use crate::{
     commons::ToString,
     heads::Head,
-    wlr_client::{configs::Configurations, wlr_mode::OutputMode},
+    wlr_client::{output::configs::Configurations, output::wlr_mode::OutputMode},
 };
 
 pub(crate) fn exec(head: &Head, configs: &Configurations) {

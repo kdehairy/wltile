@@ -30,7 +30,7 @@ use wayland_protocols::xdg::shell::client::{
 
 use crate::wlr_client::errors::ClientError;
 use crate::wlr_client::shmem::Shmem;
-use crate::wlr_client::wlr_head::OutputHead;
+use crate::wlr_client::output::wlr_head::OutputHead;
 use crate::wlr_client::ConnectionManager;
 
 #[derive(Debug, PartialEq)]

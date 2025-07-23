@@ -5,7 +5,7 @@ use crate::{
     commons::TryFrom,
     wlr_client::{
         self,
-        config_writer::{HeadUpdateRequest, UpdateRequest},
+        output::config_writer::{HeadUpdateRequest, UpdateRequest},
     },
 };
 

@@ -4,9 +4,9 @@ use std::fmt::Display;
 use wayland_client::backend::ObjectId;
 use wayland_client::protocol::wl_output::Transform;
 
-use crate::wlr_client::wlr_mode::OutputMode;
+use crate::wlr_client::output::wlr_mode::OutputMode;
 
-use super::wlr_client::wlr_head::OutputHead;
+use super::wlr_client::output::wlr_head::OutputHead;
 use super::wlr_client::point::Point;
 
 #[derive(Default)]
