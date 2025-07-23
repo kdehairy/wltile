@@ -83,6 +83,7 @@ type AsyncState = Arc<RwLock<DisplayState>>;
 pub struct DisplayServer {
     queue_handle: QueueHandle<StateWrapper>,
     sh_mem: Shmem,
+    sh_mem_offset: isize,
     wl_shm: WlShm,
     wl_pool: WlShmPool,
     wl_compositor: WlCompositor,
@@ -150,6 +151,7 @@ impl DisplayServer {
         let display_server = DisplayServer {
             queue_handle,
             sh_mem,
+            sh_mem_offset: 0,
             wl_shm,
             wl_pool,
             wl_compositor,
@@ -221,7 +223,7 @@ impl DisplayServer {
                 }
             }
             let wl_buff = self.wl_pool.create_buffer(
-                0,
+                i32::try_from(self.sh_mem_offset).unwrap(),
                 i32::try_from(width).unwrap(),
                 i32::try_from(height).unwrap(),
                 i32::try_from(width.saturating_mul(PIXEL_SIZE)).unwrap(),
@@ -249,8 +251,15 @@ impl DisplayServer {
                 transform: None,
             };
             unsafe {
-                std::ptr::copy(buff.as_ptr(), self.sh_mem.addr, buff.len());
-            };
+                std::ptr::copy(
+                    buff.as_ptr(),
+                    self.sh_mem.addr.offset(self.sh_mem_offset),
+                    buff.len(),
+                );
+            }
+            self.sh_mem_offset = self
+                .sh_mem_offset
+                .saturating_add(isize::try_from(buff.len()).unwrap());
             surface.state = State::Ready;
             self.state.write().unwrap().surfaces.push(surface);
         }

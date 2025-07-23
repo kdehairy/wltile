@@ -35,15 +35,15 @@ impl ConnectionManager {
         let connection = Connection::connect_to_env()?;
         let (globals, mut queue) = registry_queue_init::<Data>(&connection)?;
         trace!("wayland global objects received");
-        #[cfg(debug_assertions)]
-        {
-            trace!("List of found globals:");
-            globals.contents().with_list(|list| {
-                for i in list {
-                    trace!("{}: v{}", i.interface, i.version);
-                }
-            });
-        }
+        // #[cfg(debug_assertions)]
+        // {
+        //     trace!("List of found globals:");
+        //     globals.contents().with_list(|list| {
+        //         for i in list {
+        //             trace!("{}: v{}", i.interface, i.version);
+        //         }
+        //     });
+        // }
 
         thread::spawn(move || loop {
             // We don't really care about this specific queue.

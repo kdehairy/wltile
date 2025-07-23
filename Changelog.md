@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Corrupting previously used drawing buffer before compositor releases it.
+
 ## [v1.1.0]
 ### Added
 - Verbosity flag (-v[v[v]]).

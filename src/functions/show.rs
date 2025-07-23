@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use crate::wlr_client::{self, errors::ClientError, wlr_head::OutputHead};
 
 #[allow(clippy::print_stdout)]
@@ -13,6 +15,7 @@ pub(crate) fn exec(client: &mut wlr_client::Client) -> Result<(), ClientError> {
     let display_server = client.get_display_server()?;
     for head in output_heads {
         display_server.write(head.name(), Some(&head))?;
+        //thread::sleep(Duration::from_secs(1));
     }
     let input_server = client.get_input_server()?;
     input_server.wait_for_user_input();
