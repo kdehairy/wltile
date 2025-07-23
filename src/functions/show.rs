@@ -1,4 +1,3 @@
-use std::{thread, time::Duration};
 
 use crate::wlr_client::{self, errors::ClientError, wlr_head::OutputHead};
 
