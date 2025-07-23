@@ -62,6 +62,7 @@ struct DisplayState {
 struct Surface {
     wl_surface: WlSurface,
     wl_buff: WlBuffer,
+    sh_mem_offset: isize,
     xdg_surface: XdgSurface,
     xdg_toplevel: XdgToplevel,
     state: State,
@@ -107,7 +108,7 @@ impl DisplayServer {
 
         let wl_outputs: Vec<WlOutput> = conn_man.bind_all_globals(&queue_handle, 4..=4, ())?;
 
-        let (buff, ..) = rasterize_txt("HDMI-2HDMI-2");
+        let (buff, ..) = rasterize_txt("HDMI-2HDMI-2".repeat(wl_outputs.len()).as_str());
         debug!("Estemated display buffer: size: {}", buff.len());
         let sh_mem: Shmem = Shmem::create(buff.len()).unwrap();
         let size = i32::try_from(buff.len()).unwrap();
@@ -202,7 +203,15 @@ impl DisplayServer {
 
         if let Some(s) = stored_surface {
             unsafe {
-                std::ptr::copy(buff.as_ptr(), self.sh_mem.addr, buff.len());
+                std::ptr::copy(
+                    buff.as_ptr(),
+                    //FIXME: This is assuming that the same text (in size) is being displayed.
+                    // If this assumption breaks the pixel buffer will overflow to the next.
+                    // This is fine globally for the crate, since we are always writing the output
+                    // name. But from the display module perspective, it does not know that.
+                    self.sh_mem.addr.offset(s.sh_mem_offset),
+                    buff.len(),
+                );
             };
             s.state = State::Ready;
             drop(rw_lock);
@@ -241,25 +250,31 @@ impl DisplayServer {
             wl_surface.commit();
             xdg_toplevel.set_fullscreen(wl_output.as_ref());
 
+            unsafe {
+                std::ptr::copy(
+                    buff.as_ptr(),
+                    //FIXME: We need to check first if from this offset forward we have enough space
+                    // in the shmem.
+                    // It's Ok from the whole crate perspective, since we are always going through
+                    // the outputs once, and we allocate enough buffer for them all (and a bit more).
+                    self.sh_mem.addr.offset(self.sh_mem_offset),
+                    buff.len(),
+                );
+            }
+
+            self.sh_mem_offset = self
+                .sh_mem_offset
+                .saturating_add(isize::try_from(buff.len()).unwrap());
             let mut surface = Surface {
                 wl_surface,
                 wl_buff,
+                sh_mem_offset: self.sh_mem_offset,
                 xdg_surface,
                 xdg_toplevel,
                 state: State::Wait,
                 output: wl_output,
                 transform: None,
             };
-            unsafe {
-                std::ptr::copy(
-                    buff.as_ptr(),
-                    self.sh_mem.addr.offset(self.sh_mem_offset),
-                    buff.len(),
-                );
-            }
-            self.sh_mem_offset = self
-                .sh_mem_offset
-                .saturating_add(isize::try_from(buff.len()).unwrap());
             surface.state = State::Ready;
             self.state.write().unwrap().surfaces.push(surface);
         }
@@ -287,6 +302,14 @@ impl DisplayState {
             }
         }
         result
+    }
+}
+
+impl Drop for DisplayState {
+    fn drop(&mut self) {
+        for output in &self.outputs {
+            output.release();
+        }
     }
 }
 
