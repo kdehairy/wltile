@@ -160,12 +160,18 @@ impl ConfigWriter {
             info!("Applying new configurations");
             output_configuration.apply();
             let result;
-            if let Err(err) = self.queue.roundtrip(&mut self.state) {
-                result = Err(format!("error sending request to compositor: {err}"));
-            } else if let Ok(Status::Succeeded) = self.status_receiver.recv_timeout(Duration::new(5, 0)) {
-                result = Ok(());
-            } else {
-                result = Err(String::from("failed to update configurations"));
+            match self.queue.roundtrip(&mut self.state) {
+                Err(err) => {
+                    result = Err(format!("error sending request to compositor: {err}"));
+                }
+                _ => match self.status_receiver.recv_timeout(Duration::new(5, 0)) {
+                    Ok(Status::Succeeded) => {
+                        result = Ok(());
+                    }
+                    _ => {
+                        result = Err(String::from("failed to update configurations"));
+                    }
+                },
             }
             output_configuration.destroy();
             result

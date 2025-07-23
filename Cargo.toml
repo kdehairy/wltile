@@ -2,7 +2,7 @@
 name = "wltile"
 version = "1.1.1"
 authors = ["Khaled Eldoheiri <khaled@eldoheiri.com>"]
-edition = "2021"
+edition = "2024"
 description = "A cli tool that positions outputs/displays for wlroots based compositors"
 readme = "README.md"
 repository = "https://gitlab.com/eldoheiri/wltile"
