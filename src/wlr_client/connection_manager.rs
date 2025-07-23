@@ -23,6 +23,11 @@ use wayland_client::{
 
 use crate::wlr_client::errors::ClientError;
 
+/// The main function for `ConnectionManager` is to manage bindings to global objects.
+///
+/// binding more than once to global objects always tears down the previous binding and only the
+/// last is kept functioning. This needs a single point of responsibility to make sure that
+/// different parts of the app do not step on each other's toes.
 #[derive(Clone)]
 pub(crate) struct ConnectionManager {
     connection: Connection,
@@ -31,19 +36,23 @@ pub(crate) struct ConnectionManager {
 }
 
 impl ConnectionManager {
+    /// Establishes the connection to wayland socket and starts the pulling thread.
+    ///
+    /// The pulling threads only pulls from the socket and queues the events in the relevant queues.
+    /// For each queue, there should be a call to [`EventQueue::dispatch_pending`]
     pub(super) fn connect() -> Result<ConnectionManager, ClientError> {
         let connection = Connection::connect_to_env()?;
         let (globals, mut queue) = registry_queue_init::<Data>(&connection)?;
         trace!("wayland global objects received");
-        // #[cfg(debug_assertions)]
-        // {
-        //     trace!("List of found globals:");
-        //     globals.contents().with_list(|list| {
-        //         for i in list {
-        //             trace!("{}: v{}", i.interface, i.version);
-        //         }
-        //     });
-        // }
+        #[cfg(debug_assertions)]
+        {
+            trace!("List of found globals:");
+            globals.contents().with_list(|list| {
+                for i in list {
+                    trace!("{}: v{}", i.interface, i.version);
+                }
+            });
+        }
 
         thread::spawn(move || loop {
             // We don't really care about this specific queue.
@@ -64,6 +73,8 @@ impl ConnectionManager {
         })
     }
 
+    /// Sends a `Sync` request to wayland server and blocks waiting for all messages and requests
+    /// to arrive.
     pub(super) fn sync(&self) -> Result<(), ClientError> {
         trace!("syncing with wayland server");
         let conn = &self.connection;
@@ -100,6 +111,9 @@ impl ConnectionManager {
         self.connection.new_event_queue()
     }
 
+    /// Same as `bind_global` but instead of returning the first object of the requested
+    /// interface it finds, it will return all objects.
+    /// This is to return global objects for interfaces that has multiple like `wl_output`.
     pub(super) fn bind_all_globals<Iface, State, UData>(
         &mut self,
         queue_handle: &QueueHandle<State>,
@@ -144,6 +158,9 @@ impl ConnectionManager {
         Ok(objects)
     }
 
+    /// Binds to global object.
+    ///
+    /// It makes sure that no one else has already did a binding with it.
     pub(super) fn bind_global<Iface, State, UData>(
         &mut self,
         queue_handle: &QueueHandle<State>,
