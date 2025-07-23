@@ -28,6 +28,7 @@ const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::DEBUG;
 #[cfg(not(debug_assertions))]
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::ERROR;
 
+#[allow(clippy::too_many_lines)]
 #[tracing::instrument()]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
