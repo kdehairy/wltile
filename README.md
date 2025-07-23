@@ -3,14 +3,14 @@
 
 # Install
 ## Cargo
-```sh 
+```sh
 cargo install wltile`
 ```
 
 ### Arch Linux
 Available on AUR https://aur.archlinux.org/packages/wltile
 
-```sh 
+```sh
 paru wltile
 ```
 
@@ -20,7 +20,8 @@ wltile <COMMAND>
 
 Commands:
   list      Lists all connected outputs
-  show      Shows detailed info for the specified output
+  show      Shows the current layout. If an output is provided as argument, it shows detailed info
+            for the specified output
   position  Position outputs
   set       Sets properties of the output to a desired value
   help      Print this message or the help of the given subcommand(s)
@@ -45,6 +46,15 @@ DP-2:
 ```
 
 ## Show
+```
+wltile show [OUTPUT]
+```
+Example: Print display's name on each display
+```sh
+wltile show
+```
+
+Example: Show details about a specific display/output
 ```sh
 $ wltile show DP-2
 Make: Lenovo Group Limited
@@ -70,11 +80,11 @@ Modes:
           11. 800 x 600 @ 120 kHz
           12. 640 x 480 @ 120 kHz
 ```
-Modes format is as following: `<ordinal> <resolution> @ <refresh rate> <prefered mode>`. 
+Modes format is as following: `<ordinal> <resolution> @ <refresh rate> <prefered mode>`.
 The `<ordinal>` is used later to refer to the mode in other operations (for
 example to set the mode to a desired one).
 
-Modes are always shown ordered from the highest resolution and referesh rate, 
+Modes are always shown ordered from the highest resolution and referesh rate,
 to the lowest. This makes the ordinals stable between runs.
 
 ## Position
@@ -102,9 +112,9 @@ $ wltile position DP-2 left-of eDP-1 align-bottom
 wltile set <TARGET_OUTPUT> <PROPERTY> <VALUE>
 
 Arguments:
-  <TARGET_OUTPUT>  
+  <TARGET_OUTPUT>
   <PROPERTY>       [possible values: mode, scale, rotation]
-  <VALUE>          
+  <VALUE>
 
 Options:
   -h, --help  Print help
@@ -137,7 +147,7 @@ Modes:
           12. 640 x 480 @ 120 kHz
 
 # set the desired mode using shown ordinal
-$ wltile set DP-2 mode 3 
+$ wltile set DP-2 mode 3
 
 $ wltile set DP-2 scale 1.5
 
