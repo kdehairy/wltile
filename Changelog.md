@@ -1,9 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+## [v1.1.0]
 ### Added
 - Verbosity flag (-v[v[v]]).
-- `show` command without arguments displays output name on each output.
+- `show` command without arguments prints output name on each output.
 
 ### Changed
 - Default logging verbosity in release to ERROR.
@@ -51,7 +52,8 @@
 - position two displays relative to each other either left or right.
 - while positioning the displays, align them to bottom or top.
 
-[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.4...main
+[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.1.0...main
+[v1.1.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.0.0...v1.1.0
 [v1.0.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.4...v1.0.0
 [v0.3.4]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://gitlab.com/eldoheiri/wltile/-/compare/v0.3.2...v0.3.3
