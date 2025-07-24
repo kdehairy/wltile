@@ -34,14 +34,8 @@ pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) -> Result<(
 
 fn is_vertical(head: &Head<'_>) -> bool {
     match head.transform() {
-        Transform::Normal |
-        Transform::_180 |
-        Transform::Flipped |
-        Transform::Flipped180 => false,
-        Transform::_90 |
-        Transform::_270 |
-        Transform::Flipped90 |
-        Transform::Flipped270 => true,
+        Transform::Normal | Transform::_180 | Transform::Flipped | Transform::Flipped180 => false,
+        Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => true,
         _ => panic!("Unexpected value for transform"),
     }
 }
@@ -139,14 +133,22 @@ fn scaled_corrected_sizes(target_setup: &TargetSetup) -> (Point, Point) {
 
     let target_w = f64::from(target_setup.target.mode().size().0) / target_setup.target.scale();
     let target_w = target_w.round() as i32;
-    debug!("{} size: {target_w} x {target_h}", target_setup.target.name());
+    debug!(
+        "{} size: {target_w} x {target_h}",
+        target_setup.target.name()
+    );
 
-    let reference_h = f64::from(target_setup.reference.mode().size().1) / target_setup.reference.scale();
+    let reference_h =
+        f64::from(target_setup.reference.mode().size().1) / target_setup.reference.scale();
     let reference_h = reference_h.round() as i32;
 
-    let reference_w = f64::from(target_setup.reference.mode().size().0) / target_setup.reference.scale();
+    let reference_w =
+        f64::from(target_setup.reference.mode().size().0) / target_setup.reference.scale();
     let reference_w = reference_w.round() as i32;
-    debug!("{} size: {reference_w} x {reference_h}", target_setup.reference.name());
+    debug!(
+        "{} size: {reference_w} x {reference_h}",
+        target_setup.reference.name()
+    );
 
     let target = if is_vertical(&target_setup.target) {
         Point(target_h, target_w)
@@ -161,7 +163,10 @@ fn scaled_corrected_sizes(target_setup: &TargetSetup) -> (Point, Point) {
         Point(reference_w, reference_h)
     };
     debug!("{} corrected size: {target}", target_setup.target.name());
-    debug!("{} corrected size: {reference}", target_setup.reference.name());
+    debug!(
+        "{} corrected size: {reference}",
+        target_setup.reference.name()
+    );
 
     (target, reference)
 }

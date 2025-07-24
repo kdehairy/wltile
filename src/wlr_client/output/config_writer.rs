@@ -1,11 +1,11 @@
 use core::f64;
 use std::fmt::Display;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
 
 use tracing::{debug, error, info, trace, warn};
-use wayland_client::protocol::wl_output::Transform;
 use wayland_client::Proxy;
+use wayland_client::protocol::wl_output::Transform;
 use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::ZwlrOutputModeV1;
 use wayland_protocols_wlr::output_management::v1::client::{
@@ -17,8 +17,8 @@ use wayland_protocols_wlr::output_management::v1::client::{
 use crate::commons::ToString;
 use crate::wlr_client::ConnectionManager;
 
-use crate::wlr_client::point::Point;
 use super::wlr_head::OutputHead;
+use crate::wlr_client::point::Point;
 
 impl Dispatch<ZwlrOutputConfigurationV1, ()> for State {
     fn event(

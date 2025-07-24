@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
 use tracing::trace;
-use wayland_client::backend::ObjectId;
 use wayland_client::Dispatch;
 use wayland_client::Proxy;
+use wayland_client::backend::ObjectId;
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::{
     Event, ZwlrOutputModeV1,
 };

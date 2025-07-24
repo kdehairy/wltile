@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
 use wayland_client::{
+    ConnectError, DispatchError,
     backend::WaylandError,
     globals::{BindError, GlobalError},
-    ConnectError, DispatchError,
 };
 
 #[derive(Debug)]

@@ -4,14 +4,14 @@ pub mod errors;
 pub mod point;
 pub mod shmem;
 
-pub(crate) mod output;
 pub(crate) mod input;
+pub(crate) mod output;
 
+use display::DisplayServer;
+use errors::ClientError;
+use input::InputServer;
 use output::config_writer::{ConfigWriter, UpdateRequest};
 use output::configs::Configurations;
-use display::DisplayServer;
-use input::InputServer;
-use errors::ClientError;
 use tracing::{debug, trace};
 
 use wayland_client::EventQueue;
@@ -45,7 +45,6 @@ impl Client {
         queue.dispatch_pending(&mut configurations)?;
         debug!("configurations received");
 
-
         trace!("started display server");
 
         Ok(Client {
@@ -62,7 +61,10 @@ impl Client {
     }
 
     /// Updates the outputs configurations to match the provided request.
-    pub(crate) fn update_configurations(&self, update_request: &UpdateRequest) -> Result<(), String> {
+    pub(crate) fn update_configurations(
+        &self,
+        update_request: &UpdateRequest,
+    ) -> Result<(), String> {
         trace!("received update request: {update_request}");
         let mut config_writer: ConfigWriter =
             config_writer::ConfigWriter::new(&self.connection_manager);

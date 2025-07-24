@@ -86,7 +86,11 @@ impl Display for Head<'_> {
         write!(
             f,
             "{} => {} {} {} @ {}",
-            head.name(), head.make(), head.model(), self.current_mode.size(), head.position()
+            head.name(),
+            head.make(),
+            head.model(),
+            self.current_mode.size(),
+            head.position()
         )
     }
 }

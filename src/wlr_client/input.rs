@@ -1,7 +1,7 @@
 use std::{
     sync::{
-        mpsc::{channel, Receiver, Sender},
         Arc, RwLock,
+        mpsc::{Receiver, Sender, channel},
     },
     thread,
     time::Duration,
@@ -9,14 +9,14 @@ use std::{
 
 use tracing::{error, trace};
 use wayland_client::{
+    Dispatch, EventQueue, QueueHandle, WEnum,
     protocol::{
         wl_keyboard::WlKeyboard,
         wl_seat::{self, Capability, WlSeat},
     },
-    Dispatch, EventQueue, QueueHandle, WEnum,
 };
 
-use crate::wlr_client::{errors::ClientError, ConnectionManager};
+use crate::wlr_client::{ConnectionManager, errors::ClientError};
 
 type AsyncState = Arc<RwLock<KeyboardState>>;
 

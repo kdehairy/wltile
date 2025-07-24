@@ -3,8 +3,8 @@ use std::{
     os::fd::OwnedFd,
     rc::Rc,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     thread::{self},
     time::{self, Duration},
@@ -12,13 +12,13 @@ use std::{
 
 use tracing::{error, trace};
 use wayland_client::{
-    backend::{protocol, Backend, ObjectData, ObjectId},
-    globals::{registry_queue_init, GlobalList, GlobalListContents},
+    Connection, Dispatch, EventQueue, Proxy, QueueHandle,
+    backend::{Backend, ObjectData, ObjectId, protocol},
+    globals::{GlobalList, GlobalListContents, registry_queue_init},
     protocol::{
         wl_display,
         wl_registry::{self},
     },
-    Connection, Dispatch, EventQueue, Proxy, QueueHandle,
 };
 
 use crate::wlr_client::errors::ClientError;
@@ -54,14 +54,16 @@ impl ConnectionManager {
             });
         }
 
-        thread::spawn(move || loop {
-            // We don't really care about this specific queue.
-            // We are invoking it to force the connection to read events out of the socket.
-            match queue.blocking_dispatch(&mut Data {}) {
-                Ok(num) => trace!("Dispatched {} events", num),
-                Err(err) => {
-                    error!("Failed to dispatch events: {}", err);
-                    return;
+        thread::spawn(move || {
+            loop {
+                // We don't really care about this specific queue.
+                // We are invoking it to force the connection to read events out of the socket.
+                match queue.blocking_dispatch(&mut Data {}) {
+                    Ok(num) => trace!("Dispatched {} events", num),
+                    Err(err) => {
+                        error!("Failed to dispatch events: {}", err);
+                        return;
+                    }
                 }
             }
         });
@@ -130,8 +132,13 @@ impl ConnectionManager {
         let interface = Iface::interface();
 
         // This is a panic because it's a compile-time programmer error, not a runtime error.
-        assert!(version_end <= interface.version, "Maximum version ({}) of {} was higher than the proxy's maximum version ({}); outdated wayland XML files?",
-                version.end(), interface.name, interface.version);
+        assert!(
+            version_end <= interface.version,
+            "Maximum version ({}) of {} was higher than the proxy's maximum version ({}); outdated wayland XML files?",
+            version.end(),
+            interface.name,
+            interface.version
+        );
 
         let ifaces: Vec<(u32, u32)> = self.globals.contents().with_list(|guard| {
             guard

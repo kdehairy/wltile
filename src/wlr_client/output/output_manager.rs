@@ -1,14 +1,10 @@
 use tracing::debug;
-use wayland_client::{event_created_child, Dispatch};
-use wayland_protocols_wlr::output_management::v1::client::{
-    zwlr_output_manager_v1::{
-        Event::Done, Event::Head,
-        ZwlrOutputManagerV1,
-        EVT_HEAD_OPCODE,
-    },
-    zwlr_output_head_v1::ZwlrOutputHeadV1,
-};
 use wayland_client::Proxy;
+use wayland_client::{Dispatch, event_created_child};
+use wayland_protocols_wlr::output_management::v1::client::{
+    zwlr_output_head_v1::ZwlrOutputHeadV1,
+    zwlr_output_manager_v1::{EVT_HEAD_OPCODE, Event::Done, Event::Head, ZwlrOutputManagerV1},
+};
 
 use super::configs::Configurations;
 
@@ -29,9 +25,9 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
             Done { serial } => {
                 debug!("serial: {}", serial);
                 state.set_serial(serial);
-            },
+            }
             //Finished => {},
-            _ => {},
+            _ => {}
         }
     }
     event_created_child!(Configurations, ZwlrOutputManagerV1, [

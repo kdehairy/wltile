@@ -1,4 +1,3 @@
-
 use crate::wlr_client::{self, errors::ClientError, output::wlr_head::OutputHead};
 
 #[allow(clippy::print_stdout)]

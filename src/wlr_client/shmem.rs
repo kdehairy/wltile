@@ -6,9 +6,9 @@ use std::{
 
 use errno::errno;
 use libc::{
-    c_char, c_void, close, fcntl, ftruncate64, memfd_create, mmap, munmap, F_ADD_SEALS,
-    F_SEAL_GROW, F_SEAL_SEAL, F_SEAL_SHRINK, MAP_FAILED, MAP_SHARED, MFD_ALLOW_SEALING,
-    MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE,
+    F_ADD_SEALS, F_SEAL_GROW, F_SEAL_SEAL, F_SEAL_SHRINK, MAP_FAILED, MAP_SHARED,
+    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE, c_char, c_void, close,
+    fcntl, ftruncate64, memfd_create, mmap, munmap,
 };
 
 pub(crate) struct Shmem {
@@ -76,9 +76,9 @@ impl Shmem {
 mod tests {
     use std::{ffi::c_void, fs::read_link, os::fd::AsRawFd, slice};
 
-    use libc::{mmap, munmap, MAP_SHARED, PROT_READ};
+    use libc::{MAP_SHARED, PROT_READ, mmap, munmap};
 
-    use crate::wlr_client::shmem::{Shmem, DEBUG_NAME};
+    use crate::wlr_client::shmem::{DEBUG_NAME, Shmem};
 
     #[test]
     fn create() {

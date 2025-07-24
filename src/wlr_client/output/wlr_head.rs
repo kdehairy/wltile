@@ -3,10 +3,10 @@ use std::fmt::Display;
 use tracing::{debug, trace};
 use wayland_client::backend::ObjectId;
 use wayland_client::protocol::wl_output::Transform;
-use wayland_client::{event_created_child, Dispatch};
+use wayland_client::{Dispatch, event_created_child};
 use wayland_client::{Proxy, WEnum};
 use wayland_protocols_wlr::output_management::v1::client::{
-    zwlr_output_head_v1::{Event, ZwlrOutputHeadV1, EVT_MODE_OPCODE},
+    zwlr_output_head_v1::{EVT_MODE_OPCODE, Event, ZwlrOutputHeadV1},
     zwlr_output_manager_v1::ZwlrOutputManagerV1,
     zwlr_output_mode_v1::ZwlrOutputModeV1,
 };
@@ -214,7 +214,11 @@ impl Display for OutputHead {
 impl TryFrom<i32> for Transform {
     fn try_from(other: i32) -> Result<Self, String> {
         let norm = other % 360;
-        let norm = if norm <= 0 { norm } else { norm.saturating_sub(360) };
+        let norm = if norm <= 0 {
+            norm
+        } else {
+            norm.saturating_sub(360)
+        };
 
         match norm {
             0 => Ok(Transform::Normal),

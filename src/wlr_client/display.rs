@@ -9,6 +9,7 @@ use wayland_client::backend::ObjectId;
 use wayland_client::protocol::wl_output::{self, WlOutput};
 use wayland_client::protocol::wl_surface;
 use wayland_client::{
+    Connection, Dispatch, EventQueue, QueueHandle,
     protocol::{
         wl_buffer::WlBuffer,
         wl_compositor::WlCompositor,
@@ -16,7 +17,6 @@ use wayland_client::{
         wl_shm_pool::WlShmPool,
         wl_surface::WlSurface,
     },
-    Connection, Dispatch, EventQueue, QueueHandle,
 };
 use wayland_client::{Proxy, WEnum};
 use wayland_protocols::xdg::shell::client::{xdg_toplevel, xdg_wm_base};
@@ -28,10 +28,10 @@ use wayland_protocols::xdg::shell::client::{
     xdg_wm_base::XdgWmBase,
 };
 
-use crate::wlr_client::errors::ClientError;
-use crate::wlr_client::shmem::Shmem;
-use crate::wlr_client::output::wlr_head::OutputHead;
 use crate::wlr_client::ConnectionManager;
+use crate::wlr_client::errors::ClientError;
+use crate::wlr_client::output::wlr_head::OutputHead;
+use crate::wlr_client::shmem::Shmem;
 
 #[derive(Debug, PartialEq)]
 enum State {
@@ -224,7 +224,7 @@ impl DisplayServer {
                     None => {
                         return Err(ClientError::Display {
                             msg: String::from("Could not find specified output"),
-                        })
+                        });
                     }
                 };
                 if let Some(o) = self.state.read().unwrap().wl_output_from_output_head(oh) {

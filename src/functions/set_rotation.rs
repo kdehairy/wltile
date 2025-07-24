@@ -1,8 +1,8 @@
 use wayland_client::protocol::wl_output::Transform;
 
 use crate::{
-    heads::Head,
     commons::TryFrom,
+    heads::Head,
     wlr_client::{
         self,
         output::config_writer::{HeadUpdateRequest, UpdateRequest},

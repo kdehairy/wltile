@@ -4,7 +4,7 @@ use crate::heads::{Head, Heads};
 
 use super::wlr_head::OutputHead;
 use super::wlr_mode::OutputMode;
-use wayland_client::{backend::ObjectId, Proxy};
+use wayland_client::{Proxy, backend::ObjectId};
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_head_v1::ZwlrOutputHeadV1, zwlr_output_mode_v1::ZwlrOutputModeV1,
 };
@@ -36,7 +36,9 @@ impl Configurations {
     }
 
     fn find_current_mode(&self, wlr_head: &OutputHead) -> Option<&OutputMode> {
-        wlr_head.mode_ids().iter()
+        wlr_head
+            .mode_ids()
+            .iter()
             .find(|&id| id == wlr_head.current_mode_id())
             .map(|id| self.get_mode(id))?
     }
@@ -57,8 +59,6 @@ impl Configurations {
         self.serial = serial;
     }
 
-
-
     pub fn get_head_mut(&mut self, id: &ObjectId) -> Option<&mut OutputHead> {
         self.heads.get_mut(id)
     }
@@ -78,6 +78,4 @@ impl Configurations {
     pub(crate) fn serial(&self) -> u32 {
         self.serial
     }
-
-
 }

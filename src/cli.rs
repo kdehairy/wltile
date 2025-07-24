@@ -17,7 +17,9 @@ pub enum Commands {
     #[command(about = "Lists all connected outputs")]
     List,
 
-    #[command(about = "Shows the current layout. If an output is provided as argument, it shows detailed info for the specified output")]
+    #[command(
+        about = "Shows the current layout. If an output is provided as argument, it shows detailed info for the specified output"
+    )]
     Show {
         #[arg(value_name = "OUTPUT")]
         output: Option<String>,
