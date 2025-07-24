@@ -178,7 +178,7 @@ impl OutputHead {
         &self.model
     }
 
-    pub fn _serial_number(&self) -> &str {
+    pub fn serial_number(&self) -> &str {
         &self.serial_number
     }
 

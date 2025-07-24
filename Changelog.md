@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- pick outputs by serial number, name or make/brand.
+
 ## [v1.1.1]
 ### Fixed
 - Corrupting previously used drawing buffer before compositor releases it.

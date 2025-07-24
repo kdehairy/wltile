@@ -23,8 +23,12 @@ impl<'a> Heads<'a> {
         self.heads.values().collect()
     }
 
-    pub fn get(&self, name: &str) -> Option<&Head> {
-        self.heads.get(name)
+    pub fn find(&self, expr: &str) -> Option<&Head> {
+        self.heads().into_iter().find(|head| {
+            head.serial_number() == expr
+            || head.name() == expr
+            || head.make().to_lowercase().contains(&expr.to_lowercase())
+        })
     }
 }
 
@@ -41,6 +45,10 @@ impl Head<'_> {
 
     pub fn name(&self) -> &str {
         self.output_head.name()
+    }
+
+    pub fn serial_number(&self) -> &str {
+        self.output_head().serial_number()
     }
 
     pub fn enabled(&self) -> bool {

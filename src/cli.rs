@@ -21,7 +21,7 @@ pub enum Commands {
         about = "Shows the current layout. If an output is provided as argument, it shows detailed info for the specified output"
     )]
     Show {
-        #[arg(value_name = "OUTPUT")]
+        #[arg(value_name = "OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
         output: Option<String>,
     },
 
@@ -29,7 +29,7 @@ pub enum Commands {
     #[command(arg_required_else_help = true)]
     Position {
         /// Output to be positioned
-        #[arg(value_name = "TARGET_OUTPUT")]
+        #[arg(value_name = "TARGET_OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
         target: String,
 
         /// How is it positioned to the reference output
@@ -37,7 +37,7 @@ pub enum Commands {
         relation: Relation,
 
         /// Reference Output
-        #[arg(value_name = "REFERENCE_OUTPUT")]
+        #[arg(value_name = "REFERENCE_OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
         reference: String,
 
         /// Alignment
@@ -49,7 +49,7 @@ pub enum Commands {
         arg_required_else_help = true
     )]
     Set {
-        #[arg(value_name = "TARGET_OUTPUT")]
+        #[arg(value_name = "TARGET_OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
         target: String,
 
         #[arg(value_name = "PROPERTY")]

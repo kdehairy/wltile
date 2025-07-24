@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let client = wlr_client::Client::new()?;
             let configs = client.configurations();
             let heads = configs.heads()?;
-            let head = heads.get(&output).ok_or("output does not exist")?;
+            let head = heads.find(&output).ok_or("output does not exist")?;
             functions::show_output::exec(head, configs);
             Ok(())
         }
@@ -83,11 +83,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let configs = client.configurations();
             let heads = configs.heads()?;
             let target_head = heads
-                .get(&target)
+                .find(&target)
                 .cloned()
                 .ok_or("target output does not exist")?;
             let reference_head = heads
-                .get(&reference)
+                .find(&reference)
                 .cloned()
                 .ok_or("reference output does not exist")?;
             functions::position::exec(
@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let configs = client.configurations();
             let heads = configs.heads()?;
             let target_head = heads
-                .get(&target)
+                .find(&target)
                 .cloned()
                 .ok_or("target output does not exist")?;
             match property {
