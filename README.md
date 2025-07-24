@@ -48,7 +48,14 @@ DP-2:
 ## Show
 ```
 wltile show [OUTPUT]
+
+Arguments:
+  [OUTPUT]  Could be a serial number, name or partial match with the screen make
+
+Options:
+  -h, --help  Print help
 ```
+
 Example: Print display's name on each display
 ```sh
 wltile show

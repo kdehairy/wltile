@@ -19,6 +19,7 @@ pub fn exec(heads: &Heads) {
     for head in heads.heads() {
         if head.enabled() {
             println!("{}:", head.name().bold());
+            print_serial_number(head);
             print_make(head);
             print_size(head);
             print_physical_size(head);
@@ -26,6 +27,11 @@ pub fn exec(heads: &Heads) {
             print_position(head);
         }
     }
+}
+
+#[allow(clippy::print_stdout)]
+fn print_serial_number(head: &Head) {
+    println!("\tSerial Number: {}", head.serial_number());
 }
 
 #[allow(clippy::print_stdout)]

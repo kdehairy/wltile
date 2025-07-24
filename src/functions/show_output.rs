@@ -7,6 +7,8 @@ use crate::{
 };
 
 pub(crate) fn exec(head: &Head, configs: &Configurations) {
+    print_name(head);
+    print_serial_number(head);
     print_make(head);
     print_size(head);
     print_transform(head);
@@ -66,6 +68,16 @@ fn print_refresh(head: &Head) {
         "Refresh Rate: {} kHz",
         f64::from(head.mode().refresh()).div(1000_f64).round()
     );
+}
+
+#[allow(clippy::print_stdout)]
+fn print_name(head: &Head) {
+    println!("Name: {}", head.name());
+}
+
+#[allow(clippy::print_stdout)]
+fn print_serial_number(head: &Head) {
+    println!("Serial Number: {}", head.serial_number());
 }
 
 #[allow(clippy::print_stdout)]
