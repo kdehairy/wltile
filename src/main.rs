@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let configs = client.configurations();
             let heads = configs.heads()?;
             let head = heads.find(&output).ok_or("output does not exist")?;
-            functions::show_output::exec(head, configs);
+            functions::show_output::exec(head, &configs);
             Ok(())
         }
         Commands::Show { output: None } => {
@@ -137,6 +137,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
+            Ok(())
+        }
+        Commands::Daemon { config } => {
+            // read and parse the file
+            // execute the commands in it in sequence
+            // set a watcher on the file
+            //
+            // set a SIGHUB & SIGTERM handlers
+            //
+            // Get notified if one of the commands' target is removed or added.
             Ok(())
         }
     }

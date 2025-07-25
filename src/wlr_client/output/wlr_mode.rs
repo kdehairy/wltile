@@ -8,19 +8,19 @@ use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::{
     Event, ZwlrOutputModeV1,
 };
 
-use super::configs::Configurations;
 use crate::wlr_client::point::Point;
+use crate::wlr_client::StateWrapper;
 
-impl Dispatch<ZwlrOutputModeV1, ()> for Configurations {
+impl Dispatch<ZwlrOutputModeV1, ()> for StateWrapper {
     fn event(
-        state: &mut Self,
+        wrapper: &mut Self,
         proxy: &ZwlrOutputModeV1,
         event: <ZwlrOutputModeV1 as wayland_client::Proxy>::Event,
         _data: &(),
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        if let Some(mode) = state.get_mode_mut(&proxy.id()) {
+        if let Some(mode) = wrapper.state.write().unwrap().get_mode_mut(&proxy.id()) {
             match event {
                 Event::Size { width, height } => {
                     trace!("Mode {}: size={}", mode.wl_id(), Point(width, height));

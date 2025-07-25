@@ -1,4 +1,4 @@
-use std::ops::Div;
+use std::{ops::Div, sync::RwLockReadGuard};
 
 use crate::{
     commons::ToString,
@@ -6,7 +6,7 @@ use crate::{
     wlr_client::{output::configs::Configurations, output::wlr_mode::OutputMode},
 };
 
-pub(crate) fn exec(head: &Head, configs: &Configurations) {
+pub(crate) fn exec(head: &Head, configs: &RwLockReadGuard<'_, Configurations>) {
     print_name(head);
     print_serial_number(head);
     print_make(head);

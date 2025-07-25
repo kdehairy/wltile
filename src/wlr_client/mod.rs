@@ -7,24 +7,35 @@ pub mod shmem;
 pub(crate) mod input;
 pub(crate) mod output;
 
+use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::thread;
+use std::time::Duration;
+
 use display::DisplayServer;
 use errors::ClientError;
 use input::InputServer;
 use output::config_writer::{ConfigWriter, UpdateRequest};
 use output::configs::Configurations;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 
 use wayland_client::EventQueue;
+use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_handle_v1::State;
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
 use crate::wlr_client::connection_manager::ConnectionManager;
 use crate::wlr_client::output::config_writer;
 
+type AsyncState = Arc<RwLock<Configurations>>;
+
+struct StateWrapper {
+    state: AsyncState,
+}
+
 /// wlroots client that handles communication with the compositor.
 ///
 /// The client is unusable until the first invokation of `connect()` method.
 pub struct Client {
-    configurations: Configurations,
+    configurations: AsyncState,
     output_manager: ZwlrOutputManagerV1,
     connection_manager: ConnectionManager,
     display_server: Option<DisplayServer>,
@@ -32,23 +43,42 @@ pub struct Client {
 }
 
 impl Client {
-    /// Connects to the wlroots compositor and receive the outputs configurations.
     pub fn new() -> Result<Client, ClientError> {
         let mut conn_man = ConnectionManager::connect()?;
-        let mut queue: EventQueue<Configurations> = conn_man.new_queue();
+        let mut queue: EventQueue<StateWrapper> = conn_man.new_queue();
         let queue_handle = queue.handle();
 
-        let mut configurations = Configurations::default();
+        let state = Arc::new(RwLock::new(Configurations::default()));
         let output_manager: ZwlrOutputManagerV1 = conn_man.bind_global(&queue_handle, 4..=4, ())?;
         trace!("output_manager is binded");
         conn_man.sync()?;
-        queue.dispatch_pending(&mut configurations)?;
+        queue.dispatch_pending(&mut StateWrapper {
+            state: state.clone(),
+        })?;
         debug!("configurations received");
+
+        thread::spawn({
+            let mut state = StateWrapper {
+                state: state.clone(),
+            };
+            move || {
+                thread::sleep(Duration::from_millis(16));
+
+                // flushing all out going requests, if any
+                if let Err(err) = queue.flush() {
+                    error!("Failed to flush out going events: {}", err);
+                }
+
+                if let Err(err) = queue.dispatch_pending(&mut state) {
+                    error!("Error dispatching events: {}", err);
+                }
+            }
+        });
 
         trace!("started display server");
 
         Ok(Client {
-            configurations,
+            configurations: state,
             output_manager,
             connection_manager: conn_man,
             display_server: None,
@@ -56,8 +86,8 @@ impl Client {
         })
     }
 
-    pub fn configurations(&self) -> &Configurations {
-        &self.configurations
+    pub fn configurations(&self) -> RwLockReadGuard<'_, Configurations> {
+        self.configurations.read().unwrap()
     }
 
     /// Updates the outputs configurations to match the provided request.

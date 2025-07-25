@@ -12,13 +12,13 @@ use wayland_protocols_wlr::output_management::v1::client::{
 };
 
 use crate::commons::{ToString, TryFrom};
+use crate::wlr_client::StateWrapper;
 
-use super::configs::Configurations;
 use crate::wlr_client::point::Point;
 
-impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
+impl Dispatch<ZwlrOutputHeadV1, ()> for StateWrapper {
     fn event(
-        state: &mut Self,
+        wrapper: &mut Self,
         proxy: &ZwlrOutputHeadV1,
         event: <ZwlrOutputHeadV1 as wayland_client::Proxy>::Event,
         _data: &(),
@@ -26,7 +26,8 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
         let mut kill_me_please = false;
-        if let Some(head) = state.get_head_mut(&proxy.id()) {
+        let mut configs = wrapper.state.write().unwrap();
+        if let Some(head) = configs.get_head_mut(&proxy.id()) {
             match event {
                 Event::Name { name } => {
                     debug!("Head {}: name={}", head.id().to_string(), name);
@@ -40,7 +41,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
                 Event::Mode { mode } => {
                     trace!("Head {}: mode={}", head.id(), mode.id());
                     head.add_mode(&mode);
-                    state.add_mode(mode);
+                    configs.add_mode(mode);
                 }
                 Event::Enabled { enabled } => head.enabled = !matches!(enabled, 0),
                 Event::CurrentMode { mode } => {
@@ -80,13 +81,13 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for Configurations {
         }
 
         if kill_me_please {
-            let head = state.remove_head(&proxy.id());
+            let head = configs.remove_head(&proxy.id());
             if let Some(head) = head {
                 head.release();
             }
         }
     }
-    event_created_child!(Configurations, ZwlrOutputManagerV1, [
+    event_created_child!(StateWrapper, ZwlrOutputManagerV1, [
         EVT_MODE_OPCODE => (ZwlrOutputModeV1, ()),
     ]);
 }

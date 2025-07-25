@@ -6,11 +6,11 @@ use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_manager_v1::{EVT_HEAD_OPCODE, Event::Done, Event::Head, ZwlrOutputManagerV1},
 };
 
-use super::configs::Configurations;
+use crate::wlr_client::StateWrapper;
 
-impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
+impl Dispatch<ZwlrOutputManagerV1, ()> for StateWrapper {
     fn event(
-        state: &mut Self,
+        wrapper: &mut Self,
         _proxy: &ZwlrOutputManagerV1,
         event: <ZwlrOutputManagerV1 as wayland_client::Proxy>::Event,
         _data: &(),
@@ -20,17 +20,17 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for Configurations {
         match event {
             Head { head } => {
                 debug!("Found head {}", head.id());
-                state.add_head(head);
+                wrapper.state.write().unwrap().add_head(head);
             }
             Done { serial } => {
                 debug!("serial: {}", serial);
-                state.set_serial(serial);
+                wrapper.state.write().unwrap().set_serial(serial);
             }
             //Finished => {},
             _ => {}
         }
     }
-    event_created_child!(Configurations, ZwlrOutputManagerV1, [
+    event_created_child!(StateWrapper, ZwlrOutputManagerV1, [
         EVT_HEAD_OPCODE => (ZwlrOutputHeadV1, ()),
     ]);
 }

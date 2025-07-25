@@ -58,6 +58,14 @@ pub enum Commands {
         #[arg(value_name = "VALUE")]
         value: String,
     },
+    #[command(
+        about = "Launches wltile as a daemon watching over ouptut configuration changes and applying required configurations",
+        arg_required_else_help = true
+    )]
+    Daemon {
+        #[arg(value_name="CONFIG", long="config", short='c')]
+        config: String,
+    },
 }
 
 #[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
