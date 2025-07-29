@@ -10,17 +10,25 @@
 
 mod cli;
 mod commons;
+mod daemon;
 mod functions;
 mod heads;
 mod wlr_client;
+
+use std::env;
+use std::fs::File;
+use std::path::PathBuf;
 
 use clap::Parser;
 use cli::Cli;
 use cli::Commands;
 use cli::Property;
+use daemonize::Daemonize;
 use functions::position::TargetSetup;
+use tracing::debug;
 use tracing::level_filters::LevelFilter;
 use tracing::trace;
+
 
 #[cfg(debug_assertions)]
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::DEBUG;
@@ -139,7 +147,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             Ok(())
         }
-        Commands::Daemon { config } => {
+        Commands::Daemon {
+            config,
+            log,
+            err_log,
+            systemd,
+        } => {
             // read and parse the file
             // execute the commands in it in sequence
             // set a watcher on the file
@@ -147,7 +160,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // set a SIGHUB & SIGTERM handlers
             //
             // Get notified if one of the commands' target is removed or added.
-            Ok(())
+
+            let xdg_dirs = xdg::BaseDirectories::with_prefix("wltile");
+            let tmp_dir = env::temp_dir();
+
+            let config_path =  match config {
+                Some(path) => PathBuf::from(path),
+                None => xdg_dirs.place_config_file("config.yaml")?,
+            };
+            let log_path = match log {
+                Some(path) => PathBuf::from(path),
+                None => xdg_dirs.place_state_file("logs.log")?,
+            };
+            let err_path = match err_log {
+                Some(path) => PathBuf::from(path),
+                None => xdg_dirs.place_state_file("errors.log")?,
+            };
+            let pid_path = match xdg_dirs.place_runtime_file("daemon.pid") {
+                Ok(path) => path,
+                Err(_) => tmp_dir.join("daemon.pid"),
+            };
+
+            debug!("config file: {}", config_path.to_str().unwrap());
+            debug!("log file: {}", log_path.to_str().unwrap());
+            debug!("err file: {}", err_path.to_str().unwrap());
+            debug!("pid file: {}", pid_path.to_str().unwrap());
+
+            if systemd {
+                debug!("systemd managed daemon: {}", pid_path.to_str().unwrap());
+            } else {
+                let daemonize = Daemonize::new()
+                    .pid_file(pid_path)
+                    .chown_pid_file(true)
+                    .working_directory(tmp_dir)
+                    .stdout(File::create(log_path).unwrap())
+                    .stderr(File::create(err_path).unwrap());
+
+                daemonize.start()?;
+            }
+
+            daemon::daemon_main(&config_path)
         }
     }
 }

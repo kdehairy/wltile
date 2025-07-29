@@ -19,7 +19,6 @@ use output::configs::Configurations;
 use tracing::{debug, error, trace};
 
 use wayland_client::EventQueue;
-use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_handle_v1::State;
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
 use crate::wlr_client::connection_manager::ConnectionManager;

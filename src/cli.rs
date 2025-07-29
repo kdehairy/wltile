@@ -21,7 +21,10 @@ pub enum Commands {
         about = "Shows the current layout. If an output is provided as argument, it shows detailed info for the specified output"
     )]
     Show {
-        #[arg(value_name = "OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
+        #[arg(
+            value_name = "OUTPUT",
+            help = "Could be a serial number, name or partial match with the screen make"
+        )]
         output: Option<String>,
     },
 
@@ -29,7 +32,10 @@ pub enum Commands {
     #[command(arg_required_else_help = true)]
     Position {
         /// Output to be positioned
-        #[arg(value_name = "TARGET_OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
+        #[arg(
+            value_name = "TARGET_OUTPUT",
+            help = "Could be a serial number, name or partial match with the screen make"
+        )]
         target: String,
 
         /// How is it positioned to the reference output
@@ -37,7 +43,10 @@ pub enum Commands {
         relation: Relation,
 
         /// Reference Output
-        #[arg(value_name = "REFERENCE_OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
+        #[arg(
+            value_name = "REFERENCE_OUTPUT",
+            help = "Could be a serial number, name or partial match with the screen make"
+        )]
         reference: String,
 
         /// Alignment
@@ -49,7 +58,10 @@ pub enum Commands {
         arg_required_else_help = true
     )]
     Set {
-        #[arg(value_name = "TARGET_OUTPUT", help = "Could be a serial number, name or partial match with the screen make")]
+        #[arg(
+            value_name = "TARGET_OUTPUT",
+            help = "Could be a serial number, name or partial match with the screen make"
+        )]
         target: String,
 
         #[arg(value_name = "PROPERTY")]
@@ -59,12 +71,40 @@ pub enum Commands {
         value: String,
     },
     #[command(
-        about = "Launches wltile as a daemon watching over ouptut configuration changes and applying required configurations",
-        arg_required_else_help = true
+        about = "Launches wltile as a daemon watching over ouptut configuration changes and applying required configurations"
     )]
     Daemon {
-        #[arg(value_name="CONFIG", long="config", short='c')]
-        config: String,
+        #[arg(
+            value_name = "CONFIG",
+            long = "config",
+            short = 'c',
+            help = "config file path",
+            required = false
+        )]
+        config: Option<String>,
+        #[arg(
+            value_name = "LOG",
+            long = "log",
+            short = 'l',
+            help = "log file path",
+            required = false
+        )]
+        log: Option<String>,
+        #[arg(
+            value_name = "ERR",
+            long = "err",
+            short = 'e',
+            help = "error log file path",
+            required = false
+        )]
+        err_log: Option<String>,
+        #[arg(
+            value_name = "SYSTEMD",
+            long = "systemd",
+            short = 'd',
+            help = "If the daemon is managed by systemd",
+        )]
+        systemd: bool,
     },
 }
 
