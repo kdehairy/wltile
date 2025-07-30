@@ -1,13 +1,17 @@
 use std::{
-    path::Path,
-    sync::{Arc, atomic::AtomicBool},
+    path::{Path, PathBuf},
+    sync::{atomic::AtomicBool, Arc},
+    thread,
 };
 
 use libc::SIGHUP;
 use signal_hook::{consts::TERM_SIGNALS, flag, iterator::Signals};
 use tracing::trace;
 
-pub fn daemon_main(config_file: &Path) -> Result<(), Box<dyn std::error::Error>> {
+use crate::wlr_client;
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn daemon_main(config_file: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     trace!("daemon started");
     let term_now = Arc::new(AtomicBool::new(false));
     for sig in TERM_SIGNALS {
@@ -24,13 +28,22 @@ pub fn daemon_main(config_file: &Path) -> Result<(), Box<dyn std::error::Error>>
     sigs.extend(TERM_SIGNALS);
     let mut signals = Signals::new(&sigs)?;
 
-    // This is where the wayland client stuff will happen.
+    let client = wlr_client::Client::new()?;
+    let update_rx = client.subscribe();
+    thread::spawn({
+        let config_file = config_file.clone();
+        move || {
+            while let Some(()) = update_rx.recv().into_iter().next() {
+                let _ =  reload_configs(&config_file);
+            }
+        }
+    });
 
     // Infinitly iterate over signals queued to be handled.
     // This blocks on iter.next()
     for signal in &mut signals {
         match signal {
-            SIGHUP => reload_configs(config_file)?,
+            SIGHUP => reload_configs(&config_file)?,
             other => {
                 if TERM_SIGNALS.contains(&other) {
                     break;
@@ -45,5 +58,6 @@ pub fn daemon_main(config_file: &Path) -> Result<(), Box<dyn std::error::Error>>
 }
 
 fn reload_configs(_config_file: &Path) -> Result<(), std::io::Error> {
-    todo!()
+    trace!("Config file reloaded");
+    Ok(())
 }

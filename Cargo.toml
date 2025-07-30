@@ -13,6 +13,7 @@ categories = ["command-line-utilities"]
 [dependencies]
 clap = { version = "4.5.30", features = ["derive"] }
 colored = "3.0.0"
+crossbeam-channel = "0.5.15"
 daemonize = "0.5.0"
 errno = "0.3.13"
 fontdue = "0.9.3"

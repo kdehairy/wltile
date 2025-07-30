@@ -11,6 +11,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::thread;
 use std::time::Duration;
 
+use crossbeam_channel::{Receiver, Sender};
 use display::DisplayServer;
 use errors::ClientError;
 use input::InputServer;
@@ -28,6 +29,7 @@ type AsyncState = Arc<RwLock<Configurations>>;
 
 struct StateWrapper {
     state: AsyncState,
+    update_tx: Sender<()>,
 }
 
 /// wlroots client that handles communication with the compositor.
@@ -39,6 +41,7 @@ pub struct Client {
     connection_manager: ConnectionManager,
     display_server: Option<DisplayServer>,
     input_server: Option<InputServer>,
+    update_rx: Receiver<()>,
 }
 
 impl Client {
@@ -51,25 +54,30 @@ impl Client {
         let output_manager: ZwlrOutputManagerV1 = conn_man.bind_global(&queue_handle, 4..=4, ())?;
         trace!("output_manager is binded");
         conn_man.sync()?;
+
+        let (tx, rx) = crossbeam_channel::unbounded();
         queue.dispatch_pending(&mut StateWrapper {
             state: state.clone(),
+            update_tx: tx.clone(),
         })?;
         debug!("configurations received");
 
         thread::spawn({
             let mut state = StateWrapper {
                 state: state.clone(),
+                update_tx: tx,
             };
-            move || {
-                thread::sleep(Duration::from_millis(16));
+            move || loop {
+                thread::sleep(Duration::from_millis(500));
 
                 // flushing all out going requests, if any
                 if let Err(err) = queue.flush() {
                     error!("Failed to flush out going events: {}", err);
                 }
 
-                if let Err(err) = queue.dispatch_pending(&mut state) {
-                    error!("Error dispatching events: {}", err);
+                match queue.dispatch_pending(&mut state) {
+                    Ok(size) => if size > 0 {trace!("Dispatched {size} pending events")},
+                    Err(err) => error!("Error dispatching events: {}", err),
                 }
             }
         });
@@ -82,11 +90,16 @@ impl Client {
             connection_manager: conn_man,
             display_server: None,
             input_server: None,
+            update_rx: rx,
         })
     }
 
     pub fn configurations(&self) -> RwLockReadGuard<'_, Configurations> {
         self.configurations.read().unwrap()
+    }
+
+    pub fn subscribe(&self) -> Receiver<()> {
+        self.update_rx.clone()
     }
 
     /// Updates the outputs configurations to match the provided request.
@@ -107,13 +120,6 @@ impl Client {
         }
 
         Ok(self.display_server.as_mut().expect("Should not happen"))
-
-        // if let Err(err) = display_server.write(text, head) {
-        //     return Err(ClientError::Display {
-        //         msg: format!("failed to render text: {err}"),
-        //     });
-        // }
-        // Ok(())
     }
 
     pub(crate) fn get_input_server(&mut self) -> Result<&mut InputServer, ClientError> {

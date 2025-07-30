@@ -29,7 +29,6 @@ use tracing::debug;
 use tracing::level_filters::LevelFilter;
 use tracing::trace;
 
-
 #[cfg(debug_assertions)]
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::DEBUG;
 
@@ -164,7 +163,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let xdg_dirs = xdg::BaseDirectories::with_prefix("wltile");
             let tmp_dir = env::temp_dir();
 
-            let config_path =  match config {
+            let config_path = match config {
                 Some(path) => PathBuf::from(path),
                 None => xdg_dirs.place_config_file("config.yaml")?,
             };
@@ -199,7 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 daemonize.start()?;
             }
 
-            daemon::daemon_main(&config_path)
+            daemon::daemon_main(config_path)
         }
     }
 }

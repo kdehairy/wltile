@@ -1,4 +1,6 @@
-use tracing::debug;
+use std::time::Duration;
+
+use tracing::{debug, error};
 use wayland_client::Proxy;
 use wayland_client::{Dispatch, event_created_child};
 use wayland_protocols_wlr::output_management::v1::client::{
@@ -21,6 +23,10 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for StateWrapper {
             Head { head } => {
                 debug!("Found head {}", head.id());
                 wrapper.state.write().unwrap().add_head(head);
+
+                if let Err(err) = wrapper.update_tx.send_timeout((), Duration::from_secs(1)) {
+                    error!("Failed to send config update after attaching a head: {err}");
+                }
             }
             Done { serial } => {
                 debug!("serial: {}", serial);

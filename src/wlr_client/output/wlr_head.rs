@@ -1,6 +1,7 @@
 use std::fmt::Display;
+use std::time::Duration;
 
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 use wayland_client::backend::ObjectId;
 use wayland_client::protocol::wl_output::Transform;
 use wayland_client::{Dispatch, event_created_child};
@@ -54,6 +55,9 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for StateWrapper {
                 }
                 Event::Finished => {
                     kill_me_please = true;
+                    if let Err(err) = wrapper.update_tx.send_timeout((), Duration::from_secs(1)) {
+                        error!("Failed to send config update after detaching a head: {err}");
+                    }
                 }
                 Event::Make { make } => {
                     trace!("Head {}: make={}", head.id(), make);

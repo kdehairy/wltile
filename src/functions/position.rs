@@ -45,6 +45,8 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
     let (target_size, reference_size) = scaled_corrected_sizes(target_setup);
     debug!("{} size: {target_size}", target_setup.target.name());
     debug!("{} size: {reference_size}", target_setup.reference.name());
+    //FIXME: this strategy is not suitable for more than 2 outputs. we need to treat the
+    // reference output as a fixed anchor.
     let mut position = match target_setup.relation {
         Relation::RightOf | Relation::BottomOf => Point(0, 0),
         Relation::LeftOf | Relation::TopOf => target_size,
