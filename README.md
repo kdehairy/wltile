@@ -1,6 +1,10 @@
 # Overview
 `wltile` is a cli tool that positions outputs/displays for wlroots based compositors.
 
+Currently, it does not take into consideration the current positions of the outputs, when applying
+the requested changes in positions. This means that you will get a repeatable predictable overall
+layout for only two screens.
+
 # Install
 ## Cargo
 ```sh

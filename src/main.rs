@@ -9,6 +9,8 @@
 )]
 
 mod cli;
+mod config_file;
+mod wl_config;
 mod commons;
 mod daemon;
 mod functions;

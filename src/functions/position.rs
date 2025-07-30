@@ -23,9 +23,8 @@ pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) -> Result<(
         build_target_request(target_setup),
         build_reference_request(target_setup),
     ];
-    let configs = client.configurations();
     let request = UpdateRequest {
-        serial: configs.serial(),
+        serial: client.configurations().serial(),
         head_requests,
     };
     info!("position request '{}'", request);
