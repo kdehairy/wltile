@@ -34,7 +34,7 @@ pub fn daemon_main(config_file: PathBuf) -> Result<(), Box<dyn std::error::Error
         let config_file = config_file.clone();
         move || {
             while let Some(()) = update_rx.recv().into_iter().next() {
-                let _ =  reload_configs(&config_file);
+                reload_configs(&config_file);
             }
         }
     });
@@ -43,7 +43,7 @@ pub fn daemon_main(config_file: PathBuf) -> Result<(), Box<dyn std::error::Error
     // This blocks on iter.next()
     for signal in &mut signals {
         match signal {
-            SIGHUP => reload_configs(&config_file)?,
+            SIGHUP => reload_configs(&config_file),
             other => {
                 if TERM_SIGNALS.contains(&other) {
                     break;
@@ -57,7 +57,6 @@ pub fn daemon_main(config_file: PathBuf) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-fn reload_configs(_config_file: &Path) -> Result<(), std::io::Error> {
+fn reload_configs(_config_file: &Path) {
     trace!("Config file reloaded");
-    Ok(())
 }

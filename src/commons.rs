@@ -1,3 +1,5 @@
+use wayland_client::protocol::wl_output::Transform;
+
 /// Own `ToString` trait
 ///
 /// Used to add a `to_string()` method on external types that does not implement
@@ -10,4 +12,23 @@ pub trait ToString {
 
 pub trait TryFrom<T>: Sized {
     fn try_from(other: T) -> Result<Self, String>;
+}
+
+impl TryFrom<i32> for Transform {
+    fn try_from(other: i32) -> Result<Self, String> {
+        let norm = other % 360;
+        let norm = if norm <= 0 {
+            norm
+        } else {
+            norm.saturating_sub(360)
+        };
+
+        match norm {
+            0 => Ok(Transform::Normal),
+            -90 => Ok(Transform::_90),
+            -180 => Ok(Transform::_180),
+            -270 => Ok(Transform::_270),
+            _ => Err(String::from("Invalid angle")),
+        }
+    }
 }

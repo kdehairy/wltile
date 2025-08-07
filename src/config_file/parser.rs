@@ -11,17 +11,25 @@ impl FromStr for Config {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         #[derive(Debug, Deserialize)]
         struct T {
-            scale: f32,
-            position: String,
+            scale: Option<f64>,
+            mode: Option<usize>,
+            rotation: Option<i32>,
+            position: Option<String>,
         }
         let config_table = s.parse::<Table>().unwrap();
         let mut config = Config::default();
         for target in config_table {
             let t = target.1.try_into::<T>().unwrap();
+            let position = match t.position {
+                Some(position) => Some(Position::try_from(position)?),
+                None => None,
+            };
             let t = Target {
                 name: target.0,
                 scale: t.scale,
-                position: Position::try_from(t.position)?,
+                mode: t.mode,
+                rotation: t.rotation,
+                position,
             };
             config.add_target(t);
         }
@@ -53,9 +61,9 @@ mod tests {
         assert_eq!(1, config.targets().len());
         let t = config.targets().first().unwrap();
         assert_eq!("DP-2", t.name);
-        assert!(t.scale.eq(&1f32));
-        assert_eq!(Relation::LeftOf, t.position.relation);
-        assert_eq!("eDP-1", t.position.reference);
-        assert_eq!(Alignment::AlignBottom, t.position.alignment);
+        assert!(t.scale.unwrap().eq(&1f64));
+        assert_eq!(Relation::LeftOf, t.position.as_ref().unwrap().relation);
+        assert_eq!("eDP-1", t.position.as_ref().unwrap().reference);
+        assert_eq!(Alignment::AlignBottom, t.position.as_ref().unwrap().alignment);
     }
 }

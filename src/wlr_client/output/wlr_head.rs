@@ -12,7 +12,7 @@ use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_mode_v1::ZwlrOutputModeV1,
 };
 
-use crate::commons::{ToString, TryFrom};
+use crate::commons::ToString;
 use crate::wlr_client::StateWrapper;
 
 use crate::wlr_client::point::Point;
@@ -213,25 +213,6 @@ impl Display for OutputHead {
             "{} => {} {}: {} at position {}",
             self.name, self.make, self.model, self.physical_size, self.position
         )
-    }
-}
-
-impl TryFrom<i32> for Transform {
-    fn try_from(other: i32) -> Result<Self, String> {
-        let norm = other % 360;
-        let norm = if norm <= 0 {
-            norm
-        } else {
-            norm.saturating_sub(360)
-        };
-
-        match norm {
-            0 => Ok(Transform::Normal),
-            -90 => Ok(Transform::_90),
-            -180 => Ok(Transform::_180),
-            -270 => Ok(Transform::_270),
-            _ => Err(String::from("Invalid angle")),
-        }
     }
 }
 

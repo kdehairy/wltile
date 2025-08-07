@@ -7,7 +7,6 @@ pub enum Relation {
     BottomOf,
 }
 
-
 impl TryFrom<&str> for Relation {
     type Error = String;
 
@@ -22,6 +21,17 @@ impl TryFrom<&str> for Relation {
     }
 }
 
+impl From<crate::cli::Relation> for Relation {
+    fn from(value: crate::cli::Relation) -> Self {
+        match value {
+            crate::cli::Relation::LeftOf => Self::LeftOf,
+            crate::cli::Relation::RightOf => Self::RightOf,
+            crate::cli::Relation::TopOf => Self::TopOf,
+            crate::cli::Relation::BottomOf => Self::BottomOf,
+        }
+    }
+}
+
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Alignment {
@@ -29,6 +39,17 @@ pub enum Alignment {
     AlignTop,
     AlignRight,
     AlignLeft,
+}
+
+impl From<crate::cli::Alignment> for Alignment {
+    fn from(value: crate::cli::Alignment) -> Self {
+        match value{
+            crate::cli::Alignment::AlignBottom => Alignment::AlignBottom,
+            crate::cli::Alignment::AlignTop => Alignment::AlignTop,
+            crate::cli::Alignment::AlignRight => Alignment::AlignRight,
+            crate::cli::Alignment::AlignLeft => Alignment::AlignLeft,
+        }
+    }
 }
 
 impl TryFrom<&str> for Alignment {
@@ -59,33 +80,39 @@ impl TryFrom<String> for Position {
         let mut iter = value.split_whitespace();
         let relation: Relation = match iter.next() {
             Some(rel) => Relation::try_from(rel)?,
-            None => return Err(String::from("Missing relation"))
+            None => return Err(String::from("Missing relation")),
         };
 
         let reference: String = match iter.next() {
             Some(refer) => String::from(refer),
-            None => return Err(String::from("Missing relation"))
+            None => return Err(String::from("Missing relation")),
         };
 
         let alignment: Alignment = match iter.next() {
             Some(align) => Alignment::try_from(align)?,
-            None => return Err(String::from("Missing relation"))
+            None => return Err(String::from("Missing relation")),
         };
 
         Ok(Position {
             relation,
             reference,
-            alignment
+            alignment,
         })
-
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Target {
     pub name: String,
-    pub position: Position,
-    pub scale: f32,
+    pub position: Option<Position>,
+    pub scale: Option<f64>,
+    pub mode: Option<usize>,
+    pub rotation: Option<i32>,
+}
+impl Target {
+    pub(crate) fn new(name: String) -> Self {
+        Self { name, ..Default::default() }
+    }
 }
 
 #[derive(Debug, Default)]

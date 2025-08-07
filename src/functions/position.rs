@@ -2,8 +2,9 @@ use tracing::{debug, info};
 use wayland_client::protocol::wl_output::Transform;
 
 use crate::{
-    cli::{Alignment, Relation},
+    wl_config::{Alignment, Relation},
     heads::Head,
+    wl_config::Config,
     wlr_client::{
         self,
         output::config_writer::{HeadUpdateRequest, UpdateRequest},
@@ -18,17 +19,39 @@ pub struct TargetSetup<'a> {
     pub alignment: Alignment,
 }
 
-pub fn exec(target_setup: &TargetSetup, client: &wlr_client::Client) -> Result<(), String> {
-    let head_requests: Vec<HeadUpdateRequest> = vec![
-        build_target_request(target_setup),
-        build_reference_request(target_setup),
-    ];
-    let request = UpdateRequest {
-        serial: client.configurations().serial(),
-        head_requests,
-    };
-    info!("position request '{}'", request);
-    client.update_configurations(&request)
+pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), String> {
+    let configs = client.configurations();
+    let heads = configs.heads()?;
+    for target in config.targets() {
+        let position = target.position.as_ref().unwrap();
+        let target_head = heads
+            .find(&target.name)
+            .cloned()
+            .ok_or("target output does not exist")?;
+        let reference_head = heads
+            .find(&position.reference)
+            .cloned()
+            .ok_or("reference output does not exist")?;
+
+        let target_setup = TargetSetup {
+            target: target_head,
+            reference: reference_head,
+            relation: position.relation,
+            alignment: position.alignment,
+        };
+
+        let head_requests: Vec<HeadUpdateRequest> = vec![
+            build_target_request(&target_setup),
+            build_reference_request(&target_setup),
+        ];
+        let request = UpdateRequest {
+            serial: client.configurations().serial(),
+            head_requests,
+        };
+        info!("position request '{}'", request);
+        client.update_configurations(&request)?;
+    }
+    Ok(())
 }
 
 fn is_vertical(head: &Head<'_>) -> bool {

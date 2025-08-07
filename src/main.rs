@@ -9,12 +9,12 @@
 )]
 
 mod cli;
-mod config_file;
-mod wl_config;
 mod commons;
+mod config_file;
 mod daemon;
 mod functions;
 mod heads;
+mod wl_config;
 mod wlr_client;
 
 use std::env;
@@ -26,10 +26,13 @@ use cli::Cli;
 use cli::Commands;
 use cli::Property;
 use daemonize::Daemonize;
-use functions::position::TargetSetup;
 use tracing::debug;
 use tracing::level_filters::LevelFilter;
 use tracing::trace;
+
+use crate::wl_config::Config;
+use crate::wl_config::Position;
+use crate::wl_config::Target;
 
 #[cfg(debug_assertions)]
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::DEBUG;
@@ -89,25 +92,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             trace!("cli command: position {target} {relation} {reference} {alignment}");
             let client = wlr_client::Client::new()?;
-            let configs = client.configurations();
-            let heads = configs.heads()?;
-            let target_head = heads
-                .find(&target)
-                .cloned()
-                .ok_or("target output does not exist")?;
-            let reference_head = heads
-                .find(&reference)
-                .cloned()
-                .ok_or("reference output does not exist")?;
-            functions::position::exec(
-                &TargetSetup {
-                    target: target_head,
-                    reference: reference_head,
-                    relation,
-                    alignment,
-                },
-                &client,
-            )?;
+            let mut config = Config::default();
+            config.add_target(Target {
+                name: target,
+                position: Some(Position {
+                    relation: relation.into(),
+                    reference,
+                    alignment: alignment.into(),
+                }),
+                ..Default::default()
+            });
+            functions::position::exec(&config, &client)?;
             Ok(())
         }
         Commands::Set {
@@ -116,35 +111,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             value,
         } => {
             let client = wlr_client::Client::new()?;
-            let configs = client.configurations();
-            let heads = configs.heads()?;
-            let target_head = heads
-                .find(&target)
-                .cloned()
-                .ok_or("target output does not exist")?;
+            let mut config = Config::default();
+            let mut target = Target::new(target);
             match property {
                 Property::Mode => {
                     if let Ok(desired) = value.trim().parse::<usize>() {
-                        functions::set_mode::exec(&target_head, desired, &client)?;
+                        target.mode = Some(desired);
                     } else {
                         Err("Expected integer identifier for the mode")?;
                     }
                 }
                 Property::Scale => {
                     if let Ok(desired) = value.trim().parse::<f64>() {
-                        functions::set_scale::exec(&target_head, desired, &client)?;
+                        target.scale = Some(desired);
                     } else {
                         Err("Expected number identifier for the scale")?;
                     }
                 }
                 Property::Rotation => {
                     if let Ok(desired) = value.trim().parse::<i32>() {
-                        functions::set_rotation::exec(&target_head, desired, &client)?;
+                        target.rotation = Some(desired);
                     } else {
                         Err("Expected number identifier for the rotation")?;
                     }
                 }
             }
+
+            config.add_target(target);
+            functions::set_property::exec(&config, &client)?;
 
             Ok(())
         }
@@ -154,14 +148,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             err_log,
             systemd,
         } => {
-            // read and parse the file
-            // execute the commands in it in sequence
-            // set a watcher on the file
-            //
-            // set a SIGHUB & SIGTERM handlers
-            //
-            // Get notified if one of the commands' target is removed or added.
-
             let xdg_dirs = xdg::BaseDirectories::with_prefix("wltile");
             let tmp_dir = env::temp_dir();
 
