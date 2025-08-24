@@ -10,12 +10,12 @@ use super::wlr_client::output::wlr_head::OutputHead;
 use super::wlr_client::point::Point;
 
 #[derive(Default)]
-pub struct Heads<'a> {
-    heads: HashMap<String, Head<'a>>,
+pub struct Heads {
+    heads: HashMap<String, Head>,
 }
 
-impl<'a> Heads<'a> {
-    pub fn insert(&mut self, name: String, head: Head<'a>) {
+impl Heads {
+    pub fn insert(&mut self, name: String, head: Head) {
         self.heads.insert(name, head);
     }
 
@@ -26,21 +26,21 @@ impl<'a> Heads<'a> {
     pub fn find(&self, expr: &str) -> Option<&Head> {
         self.heads().into_iter().find(|head| {
             head.serial_number() == expr
-            || head.name() == expr
-            || head.make().to_lowercase().contains(&expr.to_lowercase())
+                || head.name() == expr
+                || head.make().to_lowercase().contains(&expr.to_lowercase())
         })
     }
 }
 
-#[derive(Clone)]
-pub struct Head<'a> {
-    pub output_head: &'a OutputHead,
-    pub current_mode: &'a OutputMode,
+#[derive(PartialEq, Clone)]
+pub struct Head {
+    pub output_head: OutputHead,
+    pub current_mode: OutputMode,
 }
 
-impl Head<'_> {
+impl Head {
     pub fn mode(&self) -> &OutputMode {
-        self.current_mode
+        &self.current_mode
     }
 
     pub fn name(&self) -> &str {
@@ -72,7 +72,7 @@ impl Head<'_> {
     }
 
     pub fn output_head(&self) -> &OutputHead {
-        self.output_head
+        &self.output_head
     }
 
     pub fn mode_ids(&self) -> &Vec<ObjectId> {
@@ -86,11 +86,36 @@ impl Head<'_> {
     pub fn transform(&self) -> Transform {
         self.output_head.transform()
     }
+
+    #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
+    pub fn scaled_corrected_size(&self) -> Point {
+        let hight = f64::from(self.mode().size().1) / self.scale();
+        let hight = hight.round() as i32;
+
+        let width = f64::from(self.mode().size().0) / self.scale();
+        let width = width.round() as i32;
+
+        if self.is_vertical() {
+            Point(hight, width)
+        } else {
+            Point(width, hight)
+        }
+    }
+
+    fn is_vertical(&self) -> bool {
+        match self.transform() {
+            Transform::Normal | Transform::_180 | Transform::Flipped | Transform::Flipped180 => {
+                false
+            }
+            Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => true,
+            _ => panic!("Unexpected value for transform"),
+        }
+    }
 }
 
-impl Display for Head<'_> {
+impl Display for Head {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let head = self.output_head;
+        let head = &self.output_head;
         write!(
             f,
             "{} => {} {} {} @ {}",

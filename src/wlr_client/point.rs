@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug, Default, PartialEq, Clone, Copy, Eq)]
+#[derive(Debug, Default, PartialEq, Clone, Copy, Eq, Hash)]
 pub struct Point(pub i32, pub i32);
 
 impl Display for Point {

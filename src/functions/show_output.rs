@@ -25,7 +25,7 @@ fn print_transform(head: &Head) {
 
 #[allow(clippy::print_stdout)]
 fn print_modes(head: &Head, configs: &Configurations) {
-    let current_mode = head.current_mode;
+    let current_mode = &head.current_mode;
     println!("Modes:");
     let mut modes: Vec<&OutputMode> = head
         .mode_ids()
@@ -33,8 +33,8 @@ fn print_modes(head: &Head, configs: &Configurations) {
         .map(|id| configs.get_mode(id).expect("Unexpected failure"))
         .collect();
     modes.sort_by(|a, b| b.cmp(a));
-    for (i, mode) in modes.iter().enumerate() {
-        print_mode(mode, i, current_mode == *mode);
+    for (i, &mode) in modes.iter().enumerate() {
+        print_mode(mode, i, current_mode == mode);
     }
 }
 

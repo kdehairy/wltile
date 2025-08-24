@@ -35,7 +35,7 @@ impl Dispatch<ZwlrOutputModeV1, ()> for StateWrapper {
     }
 }
 
-#[derive(Eq)]
+#[derive(Eq, Clone)]
 pub struct OutputMode {
     wl_id: ObjectId,
     wlr_mode: ZwlrOutputModeV1,

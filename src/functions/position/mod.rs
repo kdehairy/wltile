@@ -1,10 +1,11 @@
+mod layout_graph;
+
 use tracing::{debug, info};
-use wayland_client::protocol::wl_output::Transform;
 
 use crate::{
-    wl_config::{Alignment, Relation},
     heads::Head,
     wl_config::Config,
+    wl_config::{Alignment, Relation},
     wlr_client::{
         self,
         output::config_writer::{HeadUpdateRequest, UpdateRequest},
@@ -12,9 +13,9 @@ use crate::{
     },
 };
 
-pub struct TargetSetup<'a> {
-    pub target: Head<'a>,
-    pub reference: Head<'a>,
+pub struct TargetSetup {
+    pub target: Head,
+    pub reference: Head,
     pub relation: Relation,
     pub alignment: Alignment,
 }
@@ -54,17 +55,10 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), String> 
     Ok(())
 }
 
-fn is_vertical(head: &Head<'_>) -> bool {
-    match head.transform() {
-        Transform::Normal | Transform::_180 | Transform::Flipped | Transform::Flipped180 => false,
-        Transform::_90 | Transform::_270 | Transform::Flipped90 | Transform::Flipped270 => true,
-        _ => panic!("Unexpected value for transform"),
-    }
-}
-
 #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
-fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<'a> {
-    let (target_size, reference_size) = scaled_corrected_sizes(target_setup);
+fn build_reference_request(target_setup: &TargetSetup) -> HeadUpdateRequest {
+    let target_size = target_setup.target.scaled_corrected_size();
+    let reference_size = target_setup.target.scaled_corrected_size();
     debug!("{} size: {target_size}", target_setup.target.name());
     debug!("{} size: {reference_size}", target_setup.reference.name());
     //FIXME: this strategy is not suitable for more than 2 outputs. we need to treat the
@@ -109,8 +103,9 @@ fn build_reference_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateReque
     }
 }
 
-fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<'a> {
-    let (target_size, reference_size) = scaled_corrected_sizes(target_setup);
+fn build_target_request(target_setup: &TargetSetup) -> HeadUpdateRequest {
+    let target_size = target_setup.target.scaled_corrected_size();
+    let reference_size = target_setup.reference.scaled_corrected_size();
     let mut position = match target_setup.relation {
         Relation::RightOf | Relation::BottomOf => reference_size,
         Relation::LeftOf | Relation::TopOf => Point(0, 0),
@@ -148,49 +143,4 @@ fn build_target_request<'a>(target_setup: &'a TargetSetup) -> HeadUpdateRequest<
         scale: None,
         rotation: None,
     }
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
-fn scaled_corrected_sizes(target_setup: &TargetSetup) -> (Point, Point) {
-    let target_h = f64::from(target_setup.target.mode().size().1) / target_setup.target.scale();
-    let target_h = target_h.round() as i32;
-
-    let target_w = f64::from(target_setup.target.mode().size().0) / target_setup.target.scale();
-    let target_w = target_w.round() as i32;
-    debug!(
-        "{} size: {target_w} x {target_h}",
-        target_setup.target.name()
-    );
-
-    let reference_h =
-        f64::from(target_setup.reference.mode().size().1) / target_setup.reference.scale();
-    let reference_h = reference_h.round() as i32;
-
-    let reference_w =
-        f64::from(target_setup.reference.mode().size().0) / target_setup.reference.scale();
-    let reference_w = reference_w.round() as i32;
-    debug!(
-        "{} size: {reference_w} x {reference_h}",
-        target_setup.reference.name()
-    );
-
-    let target = if is_vertical(&target_setup.target) {
-        Point(target_h, target_w)
-    } else {
-        debug!("{} is vertical", target_setup.target.name());
-        Point(target_w, target_h)
-    };
-    let reference = if is_vertical(&target_setup.reference) {
-        Point(reference_h, reference_w)
-    } else {
-        debug!("{} is vertical", target_setup.reference.name());
-        Point(reference_w, reference_h)
-    };
-    debug!("{} corrected size: {target}", target_setup.target.name());
-    debug!(
-        "{} corrected size: {reference}",
-        target_setup.reference.name()
-    );
-
-    (target, reference)
 }

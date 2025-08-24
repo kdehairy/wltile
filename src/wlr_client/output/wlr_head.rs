@@ -115,6 +115,12 @@ pub struct OutputHead {
     transform: Transform,
 }
 
+impl PartialEq for OutputHead {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
 impl OutputHead {
     pub fn new(head: ZwlrOutputHeadV1) -> Self {
         Self {
