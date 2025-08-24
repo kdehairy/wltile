@@ -24,7 +24,7 @@ impl Heads {
     }
 
     pub fn find(&self, expr: &str) -> Option<&Head> {
-        self.heads().into_iter().find(|head| {
+        self.heads().into_iter().find(|&head| {
             head.serial_number() == expr
                 || head.name() == expr
                 || head.make().to_lowercase().contains(&expr.to_lowercase())
