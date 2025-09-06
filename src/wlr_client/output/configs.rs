@@ -21,10 +21,10 @@ impl Configurations {
         let mut heads = Heads::default();
         for output_head in self.output_heads() {
             let head = Head {
-                output_head,
+                output_head: output_head.clone(),
                 current_mode: {
-                    if let Some(mode) = self.find_current_mode(output_head) {
-                        mode
+                    if let Some(mode) = self.find_mode(output_head.current_mode_id()) {
+                        mode.clone()
                     } else {
                         return Err(String::from("failed to find current mode"));
                     }
@@ -35,12 +35,11 @@ impl Configurations {
         Ok(heads)
     }
 
-    fn find_current_mode(&self, wlr_head: &OutputHead) -> Option<&OutputMode> {
-        wlr_head
-            .mode_ids()
+    fn find_mode(&self, mode_id: &ObjectId) -> Option<&OutputMode> {
+        self.modes
             .iter()
-            .find(|&id| id == wlr_head.current_mode_id())
-            .map(|id| self.get_mode(id))?
+            .find(|&(id, _)| id == mode_id)
+            .map(|(_, mode)| mode)
     }
 
     pub fn add_head(&mut self, head: ZwlrOutputHeadV1) {

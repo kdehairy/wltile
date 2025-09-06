@@ -1,5 +1,5 @@
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
     LeftOf,
     RightOf,
@@ -33,7 +33,7 @@ impl From<crate::cli::Relation> for Relation {
 }
 
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Alignment {
     AlignBottom,
     AlignTop,

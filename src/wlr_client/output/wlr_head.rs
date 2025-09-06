@@ -98,7 +98,6 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for StateWrapper {
 
 #[derive(Clone, Debug)]
 pub struct OutputHead {
-    id: ObjectId,
     #[allow(clippy::struct_field_names)]
     wlr_head: ZwlrOutputHeadV1,
     name: String,
@@ -115,10 +114,15 @@ pub struct OutputHead {
     transform: Transform,
 }
 
+impl PartialEq for OutputHead {
+    fn eq(&self, other: &Self) -> bool {
+        self.wlr_head == other.wlr_head
+    }
+}
+
 impl OutputHead {
     pub fn new(head: ZwlrOutputHeadV1) -> Self {
         Self {
-            id: head.id(),
             wlr_head: head,
             name: String::default(),
             description: String::default(),
@@ -135,8 +139,8 @@ impl OutputHead {
         }
     }
 
-    pub fn id(&self) -> &ObjectId {
-        &self.id
+    pub fn id(&self) -> ObjectId {
+        self.wlr_head.id()
     }
 
     pub fn release(&self) {

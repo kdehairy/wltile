@@ -4,6 +4,9 @@
 ### Added
 - pick outputs by serial number, name or make/brand.
 
+ ### Fixed
+- Can handle 3+ display setups correctly.
+
 ## [v1.1.1]
 ### Fixed
 - Corrupting previously used drawing buffer before compositor releases it.

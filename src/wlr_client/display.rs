@@ -188,18 +188,16 @@ impl DisplayServer {
 
         let mut stored_surface = None;
         let mut rw_lock = self.state.write().unwrap();
-        if let Some(o) = output_head.as_ref() {
-            if let Some(wl_output) = rw_lock.wl_output_from_output_head(o) {
+        if let Some(o) = output_head.as_ref()
+            && let Some(wl_output) = rw_lock.wl_output_from_output_head(o) {
                 for s in &mut rw_lock.surfaces {
-                    if let Some(so) = s.output.as_ref() {
-                        if so.id() == wl_output.id() {
+                    if let Some(so) = s.output.as_ref() && so.id() == wl_output.id() {
                             stored_surface = Some(s);
                             break;
-                        }
+
                     }
                 }
             }
-        }
 
         if let Some(s) = stored_surface {
             unsafe {
