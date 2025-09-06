@@ -189,32 +189,31 @@ impl ConfigWriter {
     ) -> bool {
         let mut dirty = false;
 
-        if let Some(position) = request.position {
-            if *head.position() != position {
-                debug!(
-                    "Changes in position detected for head '{}' to {}",
-                    head.name(),
-                    position
-                );
-                head_configuration.set_position(position.0, position.1);
-                dirty = true;
-            }
+        if let Some(position) = request.position
+            && *head.position() != position
+        {
+            debug!(
+                "Changes in position detected for head '{}' to {}",
+                head.name(),
+                position
+            );
+            head_configuration.set_position(position.0, position.1);
+            dirty = true;
         }
 
-        if let Some(mode) = request.mode {
-            if *head.current_mode_id() != mode.id() {
-                debug!(
-                    "Changes in mode detected for head '{}' to {:?}",
-                    head.name(),
-                    mode
-                );
-                head_configuration.set_mode(mode);
-                dirty = true;
-            }
+        if let Some(mode) = request.mode
+            && *head.current_mode_id() != mode.id()
+        {
+            debug!(
+                "Changes in mode detected for head '{}' to {:?}",
+                head.name(),
+                mode
+            );
+            head_configuration.set_mode(mode);
+            dirty = true;
         }
 
-        if let Some(scale) = request.scale {
-            if (head.scale() - scale).abs() > f64::EPSILON {
+        if let Some(scale) = request.scale && (head.scale() - scale).abs() > f64::EPSILON {
                 debug!(
                     "Changes in scale detected for head '{}' to {}",
                     head.name(),
@@ -222,11 +221,10 @@ impl ConfigWriter {
                 );
                 head_configuration.set_scale(scale);
                 dirty = true;
-            }
         }
 
-        if let Some(transform) = request.rotation {
-            if head.transform() != transform {
+        if let Some(transform) = request.rotation
+            && head.transform() != transform {
                 debug!(
                     "Changes in rotation detected for head '{}' to {}",
                     head.name(),
@@ -235,7 +233,6 @@ impl ConfigWriter {
                 head_configuration.set_transform(transform);
                 dirty = true;
             }
-        }
 
         dirty
     }

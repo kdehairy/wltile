@@ -49,10 +49,8 @@ impl LayoutGraph {
     }
 
     fn get_edges_for_node(&self, name: &str) -> Option<&HashSet<Edge<String>>> {
-        if let Some(edges) = self.graph.get(name) {
-            if !edges.is_empty() {
+        if let Some(edges) = self.graph.get(name) && !edges.is_empty() {
                 return Some(edges);
-            }
         }
         None
     }
