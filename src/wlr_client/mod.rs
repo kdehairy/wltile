@@ -32,6 +32,17 @@ struct StateWrapper {
     update_tx: Sender<()>,
 }
 
+#[derive(Clone)]
+pub struct ConfigurationsReadLock {
+    configurations: AsyncState,
+}
+
+impl ConfigurationsReadLock {
+    pub fn read(&self) -> RwLockReadGuard<'_, Configurations> {
+        self.configurations.read().unwrap()
+    }
+}
+
 /// wlroots client that handles communication with the compositor.
 ///
 /// The client is unusable until the first invokation of `connect()` method.
@@ -39,7 +50,6 @@ pub struct Client {
     configurations: AsyncState,
     output_manager: ZwlrOutputManagerV1,
     connection_manager: ConnectionManager,
-    display_server: Option<DisplayServer>,
     input_server: Option<InputServer>,
     update_rx: Receiver<()>,
 }
@@ -65,7 +75,7 @@ impl Client {
         thread::spawn({
             let mut state = StateWrapper {
                 state: state.clone(),
-                update_tx: tx,
+                update_tx: tx.clone(),
             };
             move || loop {
                 thread::sleep(Duration::from_millis(500));
@@ -76,7 +86,11 @@ impl Client {
                 }
 
                 match queue.dispatch_pending(&mut state) {
-                    Ok(size) => if size > 0 {trace!("Dispatched {size} pending events")},
+                    Ok(size) => {
+                        if size > 0 {
+                            trace!("Dispatched {size} pending events");
+                        }
+                    }
                     Err(err) => error!("Error dispatching events: {}", err),
                 }
             }
@@ -88,14 +102,15 @@ impl Client {
             configurations: state,
             output_manager,
             connection_manager: conn_man,
-            display_server: None,
             input_server: None,
             update_rx: rx,
         })
     }
 
-    pub fn configurations(&self) -> RwLockReadGuard<'_, Configurations> {
-        self.configurations.read().unwrap()
+    pub fn configurations_read_lock(&self) -> ConfigurationsReadLock {
+        ConfigurationsReadLock {
+            configurations: self.configurations.clone(),
+        }
     }
 
     pub fn subscribe(&self) -> Receiver<()> {
@@ -106,20 +121,21 @@ impl Client {
     pub(crate) fn update_configurations(
         &self,
         update_request: &UpdateRequest,
-    ) -> Result<(), String> {
+    ) -> Result<(), ClientError> {
         trace!("received update request: {update_request}");
         let mut config_writer: ConfigWriter =
             config_writer::ConfigWriter::new(&self.connection_manager);
-        config_writer.write(update_request, &self.output_manager)
+        config_writer.write(
+            update_request,
+            &self.output_manager,
+            &self.configurations_read_lock(),
+        )?;
+        self.connection_manager.sync()
     }
 
-    pub(crate) fn get_display_server(&mut self) -> Result<&mut DisplayServer, ClientError> {
-        if self.display_server.is_none() {
-            let display_server = DisplayServer::start(&mut self.connection_manager)?;
-            self.display_server = Some(display_server);
-        }
-
-        Ok(self.display_server.as_mut().expect("Should not happen"))
+    pub(crate) fn new_display_server(&mut self) -> Result<DisplayServer, ClientError> {
+        let configs_lock = self.configurations_read_lock();
+        DisplayServer::start(&mut self.connection_manager, configs_lock)
     }
 
     pub(crate) fn get_input_server(&mut self) -> Result<&mut InputServer, ClientError> {

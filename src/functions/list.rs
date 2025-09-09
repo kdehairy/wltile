@@ -1,7 +1,8 @@
 use std::ops::Div;
 
-use crate::heads::{Head, Heads};
 use colored::{Color, Colorize};
+
+use crate::wlr_client::output::heads::{Head, Heads};
 
 const GRAY_COLOR: Color = Color::TrueColor {
     r: 88,

@@ -13,11 +13,11 @@ mod commons;
 mod config_file;
 mod daemon;
 mod functions;
-mod heads;
 mod wl_config;
 mod wlr_client;
 
 use std::env;
+use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -62,8 +62,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::List => {
             trace!("cli command: list");
             let client = wlr_client::Client::new()?;
-            let configs = client.configurations();
-            let heads = configs.heads()?;
+            let configs = client.configurations_read_lock();
+            let heads = configs.read().heads()?;
             functions::list::exec(&heads);
             Ok(())
         }
@@ -72,10 +72,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             trace!("cli command: show {output}");
             let client = wlr_client::Client::new()?;
-            let configs = client.configurations();
-            let heads = configs.heads()?;
+            let configs = client.configurations_read_lock();
+            let heads = configs.read().heads()?;
             let head = heads.find(&output).ok_or("output does not exist")?;
-            functions::show_output::exec(head, &configs);
+            functions::show_output::exec(head);
             Ok(())
         }
         Commands::Show { output: None } => {
@@ -168,6 +168,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Err(_) => tmp_dir.join("daemon.pid"),
             };
 
+            if !is_file(&config_path) {
+                Err(format!(
+                    "config file '{}' does not exist",
+                    config_path.to_str().unwrap()
+                ))?;
+            }
+
             debug!("config file: {}", config_path.to_str().unwrap());
             debug!("log file: {}", log_path.to_str().unwrap());
             debug!("err file: {}", err_path.to_str().unwrap());
@@ -176,6 +183,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if systemd {
                 debug!("systemd managed daemon: {}", pid_path.to_str().unwrap());
             } else {
+                if is_file(&pid_path) {
+                    Err(format!(
+                        "a pid file exists which might belong to an already running daemon. Please make sure the daemon is stopped and the file is cleaned first: {}",
+                        pid_path.to_str().unwrap()
+                    ))?;
+                }
+
                 let daemonize = Daemonize::new()
                     .pid_file(pid_path)
                     .chown_pid_file(true)
@@ -188,5 +202,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             daemon::daemon_main(config_path)
         }
+    }
+}
+
+fn is_file(config_path: &PathBuf) -> bool {
+    if let Ok(meta) = fs::metadata(config_path) {
+        meta.is_file()
+    } else {
+        false
     }
 }

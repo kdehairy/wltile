@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet, hash_map};
 
 use crate::{
-    heads::Head,
     wl_config::{Alignment, Relation},
-    wlr_client::point::Point,
+    wlr_client::{output::heads::Head, point::Point},
 };
 
 #[derive(Debug, PartialEq, Hash, Eq)]
@@ -25,7 +24,7 @@ impl From<&Head> for Node {
     fn from(head: &Head) -> Self {
         Self {
             name: head.name().into(),
-            position: head.position().to_owned(),
+            position: head.position(),
             width: head.scaled_corrected_size().0,
             height: head.scaled_corrected_size().1,
         }

@@ -8,8 +8,8 @@ use wayland_protocols_wlr::output_management::v1::client::zwlr_output_mode_v1::{
     Event, ZwlrOutputModeV1,
 };
 
-use crate::wlr_client::point::Point;
 use crate::wlr_client::StateWrapper;
+use crate::wlr_client::point::Point;
 
 impl Dispatch<ZwlrOutputModeV1, ()> for StateWrapper {
     fn event(
@@ -20,7 +20,9 @@ impl Dispatch<ZwlrOutputModeV1, ()> for StateWrapper {
         _conn: &wayland_client::Connection,
         _qhandle: &wayland_client::QueueHandle<Self>,
     ) {
-        if let Some(mode) = wrapper.state.write().unwrap().get_mode_mut(&proxy.id()) {
+        let mut kill_me_please = false;
+        let mut configs = wrapper.state.write().unwrap();
+        if let Some(mode) = configs.get_mode_mut(&proxy.id()) {
             match event {
                 Event::Size { width, height } => {
                     trace!("Mode {}: size={}", mode.wl_id(), Point(width, height));
@@ -28,8 +30,17 @@ impl Dispatch<ZwlrOutputModeV1, ()> for StateWrapper {
                 }
                 Event::Refresh { refresh } => mode.refresh = refresh,
                 Event::Preferred => mode.prefered = true,
-                //Event::Finished => {},
+                Event::Finished => {
+                    kill_me_please = true;
+                }
                 _ => {}
+            }
+        }
+
+        if kill_me_please {
+            let mode = configs.remove_mode(&proxy.id());
+            if let Some(mode) = mode {
+                mode.wlr_mode().release();
             }
         }
     }
@@ -59,8 +70,8 @@ impl OutputMode {
         &self.wl_id
     }
 
-    pub fn size(&self) -> &Point {
-        &self.size
+    pub fn size(&self) -> Point {
+        self.size
     }
 
     pub fn refresh(&self) -> i32 {

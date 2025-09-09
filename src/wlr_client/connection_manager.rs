@@ -1,7 +1,6 @@
 use std::{
     ops::RangeInclusive,
     os::fd::OwnedFd,
-    rc::Rc,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -31,7 +30,7 @@ use crate::wlr_client::errors::ClientError;
 #[derive(Clone)]
 pub(crate) struct ConnectionManager {
     connection: Connection,
-    globals: Rc<GlobalList>,
+    globals: Arc<GlobalList>,
     bound_interfaces: Vec<String>,
 }
 
@@ -70,7 +69,7 @@ impl ConnectionManager {
 
         Ok(ConnectionManager {
             connection,
-            globals: Rc::new(globals),
+            globals: Arc::new(globals),
             bound_interfaces: Vec::default(),
         })
     }
@@ -80,10 +79,10 @@ impl ConnectionManager {
     pub(super) fn sync(&self) -> Result<(), ClientError> {
         trace!("syncing with wayland server");
         let conn = &self.connection;
-        let done = Arc::new(SyncData::default());
+        let state = Arc::new(SyncData::default());
         let display = conn.display();
 
-        conn.send_request(&display, wl_display::Request::Sync {}, Some(done.clone()))
+        conn.send_request(&display, wl_display::Request::Sync {}, Some(state.clone()))
             .map_err(|_| ClientError::Connection {
                 msg: String::from("Failed to sync with wayland server"),
             })?;
@@ -100,7 +99,7 @@ impl ConnectionManager {
                 });
             }
             // see if the successful read included our callback
-            if done.done.load(Ordering::Relaxed) {
+            if state.done.load(Ordering::Relaxed) {
                 break;
             }
         }

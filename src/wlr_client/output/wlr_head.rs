@@ -41,7 +41,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for StateWrapper {
                 Event::PhysicalSize { width, height } => head.physical_size = Point(width, height),
                 Event::Mode { mode } => {
                     trace!("Head {}: mode={}", head.id(), mode.id());
-                    head.add_mode(&mode);
+                    head.add_mode(mode.id());
                     configs.add_mode(mode);
                 }
                 Event::Enabled { enabled } => head.enabled = !matches!(enabled, 0),
@@ -147,8 +147,8 @@ impl OutputHead {
         self.wlr_head.release();
     }
 
-    fn add_mode(&mut self, mode: &ZwlrOutputModeV1) {
-        self.mode_ids.push(mode.id());
+    fn add_mode(&mut self, mode_id: ObjectId) {
+        self.mode_ids.push(mode_id);
     }
 
     pub fn current_mode_id(&self) -> &ObjectId {
@@ -163,20 +163,20 @@ impl OutputHead {
         &self.name
     }
 
-    pub fn _description(&self) -> &str {
+    pub fn description(&self) -> &str {
         &self.description
     }
 
-    pub fn physical_size(&self) -> &Point {
-        &self.physical_size
+    pub fn physical_size(&self) -> Point {
+        self.physical_size
     }
 
     pub fn enabled(&self) -> bool {
         self.enabled
     }
 
-    pub fn position(&self) -> &Point {
-        &self.position
+    pub fn position(&self) -> Point {
+        self.position
     }
 
     pub fn make(&self) -> &str {
