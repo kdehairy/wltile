@@ -1,12 +1,12 @@
 use std::{
     sync::{
         Arc, RwLock,
-        mpsc::{Receiver, Sender, channel},
     },
     thread,
     time::Duration,
 };
 
+use crossbeam_channel::{Receiver, Sender};
 use tracing::{error, trace};
 use wayland_client::{
     Dispatch, EventQueue, QueueHandle, WEnum,
@@ -41,7 +41,7 @@ impl InputServer {
         let queue_handle = queue.handle();
         let seat: WlSeat = conn_man.bind_global(&queue_handle, 9..=9, ())?;
 
-        let (tx, rx) = channel();
+        let (tx, rx) = crossbeam_channel::unbounded();
 
         let state = Arc::new(RwLock::new(KeyboardState {
             keyboard: None,

@@ -2,6 +2,7 @@ use std::{fs, io::Read, path::Path, str::FromStr};
 
 use serde::Deserialize;
 use toml::Table;
+use tracing::debug;
 
 use crate::wl_config::{Config, Position, Target};
 
@@ -42,6 +43,7 @@ impl TryFrom<&Path> for Config {
     type Error = String;
 
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
+        debug!("parsing file {:?}", path);
         let mut file = fs::File::open(path).unwrap();
         let mut buff = String::new();
         file.read_to_string(&mut buff).unwrap();
@@ -64,6 +66,9 @@ mod tests {
         assert!(t.scale.unwrap().eq(&1f64));
         assert_eq!(Relation::LeftOf, t.position.as_ref().unwrap().relation);
         assert_eq!("eDP-1", t.position.as_ref().unwrap().reference);
-        assert_eq!(Alignment::AlignBottom, t.position.as_ref().unwrap().alignment);
+        assert_eq!(
+            Alignment::AlignBottom,
+            t.position.as_ref().unwrap().alignment
+        );
     }
 }

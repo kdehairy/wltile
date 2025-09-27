@@ -1,38 +1,33 @@
-use crate::commons::TryFrom;
+use crate::{commons::TryFrom, wlr_client::errors::ClientError};
 use wayland_client::protocol::wl_output::Transform;
 
 use crate::{
     wl_config::Config,
     wlr_client::{
         Client,
-        output::{
-            config_writer::{HeadUpdateRequest, UpdateRequest},
-            wlr_mode::OutputMode,
-        },
+        output::
+            config_writer::{HeadUpdateRequest, UpdateRequest}
+        ,
     },
 };
 
-pub fn exec(config: &Config, client: &Client) -> Result<(), String> {
+pub fn exec(config: &Config, client: &Client) -> Result<(), ClientError> {
     let mut head_requests: Vec<HeadUpdateRequest> = Vec::with_capacity(config.targets().len());
-    let configs = client.configurations();
-    let heads = configs.heads()?;
+    let configs = client.configurations_read_lock();
+    let heads = configs.read().heads()?;
     for target in config.targets() {
         let target_head = heads
             .find(&target.name)
             .ok_or("target output does not exist")?;
 
-        let mut wlr_mode = None;
+        let mut mode_id = None;
         if let Some(mode_idx) = target.mode {
-            let mut modes: Vec<&OutputMode> = target_head
-                .mode_ids()
-                .iter()
-                .map(|id| configs.get_mode(id).expect("Unexpected error"))
-                .collect();
-            modes.sort_by(|a, b| b.cmp(a));
-            if let Some(mode) = modes.get(mode_idx) {
-                wlr_mode = Some(mode.wlr_mode());
+            let mut sorted = target_head.modes().clone();
+            sorted.sort_by(|a, b| b.cmp(a));
+            if let Some(mode) = sorted.get(mode_idx) {
+                mode_id = Some(mode.id());
             } else {
-                return Err(String::from("Invalid mode identifier"));
+                Err(String::from("Invalid mode identifier"))?;
             }
         }
 
@@ -42,16 +37,16 @@ pub fn exec(config: &Config, client: &Client) -> Result<(), String> {
         }
 
         head_requests.push(HeadUpdateRequest {
-            head: target_head.output_head(),
+            head_id: target_head.id(),
             scale: target.scale,
             position: None,
-            mode: wlr_mode,
+            mode_id,
             rotation: transform,
         });
     }
 
     let request = UpdateRequest {
-        serial: configs.serial(),
+        serial: configs.read().serial(),
         head_requests,
     };
     client.update_configurations(&request)?;

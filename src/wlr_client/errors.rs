@@ -8,10 +8,31 @@ use wayland_client::{
 
 #[derive(Debug)]
 pub enum ClientError {
+    General { msg: String },
     Connection { msg: String },
     Binding { msg: String },
     Dispatch { msg: String },
     Display { msg: String },
+}
+
+impl ClientError {
+    pub fn general(msg: String) -> ClientError {
+        ClientError::General { msg }
+    }
+}
+
+impl From<&str> for ClientError {
+    fn from(value: &str) -> Self {
+        ClientError::General {
+            msg: value.to_string(),
+        }
+    }
+}
+
+impl From<String> for ClientError {
+    fn from(value: String) -> Self {
+        ClientError::General { msg: value }
+    }
 }
 
 impl From<GlobalError> for ClientError {
@@ -54,6 +75,9 @@ impl Display for ClientError {
             }
             ClientError::Display { msg } => {
                 write!(f, "failed to render on display: {msg}")
+            }
+            ClientError::General { msg } => {
+                write!(f, "{msg}")
             }
         }
     }

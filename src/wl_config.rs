@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
@@ -32,6 +34,17 @@ impl From<crate::cli::Relation> for Relation {
     }
 }
 
+impl Display for Relation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Relation::LeftOf => write!(f, "left-of"),
+            Relation::RightOf => write!(f, "right-of"),
+            Relation::TopOf => write!(f, "top-of"),
+            Relation::BottomOf => write!(f, "bottom-of"),
+        }
+    }
+}
+
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Alignment {
@@ -43,7 +56,7 @@ pub enum Alignment {
 
 impl From<crate::cli::Alignment> for Alignment {
     fn from(value: crate::cli::Alignment) -> Self {
-        match value{
+        match value {
             crate::cli::Alignment::AlignBottom => Alignment::AlignBottom,
             crate::cli::Alignment::AlignTop => Alignment::AlignTop,
             crate::cli::Alignment::AlignRight => Alignment::AlignRight,
@@ -66,7 +79,18 @@ impl TryFrom<&str> for Alignment {
     }
 }
 
-#[derive(Debug)]
+impl Display for Alignment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Alignment::AlignBottom => write!(f, "align-bottom"),
+            Alignment::AlignTop => write!(f, "align-top"),
+            Alignment::AlignRight => write!(f, "align-right"),
+            Alignment::AlignLeft => write!(f, "align-left"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Position {
     pub relation: Relation,
     pub reference: String,
@@ -85,12 +109,12 @@ impl TryFrom<String> for Position {
 
         let reference: String = match iter.next() {
             Some(refer) => String::from(refer),
-            None => return Err(String::from("Missing relation")),
+            None => return Err(String::from("Missing reference")),
         };
 
         let alignment: Alignment = match iter.next() {
             Some(align) => Alignment::try_from(align)?,
-            None => return Err(String::from("Missing relation")),
+            None => return Err(String::from("Missing alignment")),
         };
 
         Ok(Position {
@@ -101,7 +125,13 @@ impl TryFrom<String> for Position {
     }
 }
 
-#[derive(Debug, Default)]
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.relation, self.reference, self.alignment)
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Target {
     pub name: String,
     pub position: Option<Position>,
@@ -111,7 +141,30 @@ pub struct Target {
 }
 impl Target {
     pub(crate) fn new(name: String) -> Self {
-        Self { name, ..Default::default() }
+        Self {
+            name,
+            ..Default::default()
+        }
+    }
+}
+
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Target:{}", self.name)?;
+        if let Some(position) = self.position.as_ref() {
+            writeln!(f, "\tposition: {position}")?;
+        }
+        if let Some(scale) = self.scale {
+            writeln!(f, "\tscale: {scale}")?;
+        }
+        if let Some(mode) = self.mode {
+            writeln!(f, "\tmode: {mode}")?;
+        }
+        if let Some(rotation) = self.rotation {
+            writeln!(f, "\trotation: {rotation}")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -127,5 +180,16 @@ impl Config {
 
     pub fn targets(&self) -> &Vec<Target> {
         &self.targets
+    }
+}
+
+impl Display for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Config:")?;
+        for t in &self.targets {
+            writeln!(f, "\t{t}")?;
+        }
+
+        Ok(())
     }
 }

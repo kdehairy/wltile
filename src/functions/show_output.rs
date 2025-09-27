@@ -1,12 +1,11 @@
-use std::{ops::Div, sync::RwLockReadGuard};
+use std::ops::Div;
 
 use crate::{
     commons::ToString,
-    heads::Head,
-    wlr_client::{output::configs::Configurations, output::wlr_mode::OutputMode},
+    wlr_client::output::heads::{Head, Mode},
 };
 
-pub(crate) fn exec(head: &Head, configs: &RwLockReadGuard<'_, Configurations>) {
+pub(crate) fn exec(head: &Head) {
     print_name(head);
     print_serial_number(head);
     print_make(head);
@@ -15,7 +14,7 @@ pub(crate) fn exec(head: &Head, configs: &RwLockReadGuard<'_, Configurations>) {
     print_physical_size(head);
     print_refresh(head);
     print_position(head);
-    print_modes(head, configs);
+    print_modes(head);
 }
 
 #[allow(clippy::print_stdout)]
@@ -24,22 +23,18 @@ fn print_transform(head: &Head) {
 }
 
 #[allow(clippy::print_stdout)]
-fn print_modes(head: &Head, configs: &Configurations) {
-    let current_mode = &head.current_mode;
+fn print_modes(head: &Head) {
+    let current_mode = head.mode();
     println!("Modes:");
-    let mut modes: Vec<&OutputMode> = head
-        .mode_ids()
-        .iter()
-        .map(|id| configs.get_mode(id).expect("Unexpected failure"))
-        .collect();
-    modes.sort_by(|a, b| b.cmp(a));
-    for (i, &mode) in modes.iter().enumerate() {
+    let mut sorted = head.modes().clone();
+    sorted.sort_by(|a, b| b.cmp(a));
+    for (i, mode) in sorted.iter().enumerate() {
         print_mode(mode, i, current_mode == mode);
     }
 }
 
 #[allow(clippy::print_stdout)]
-fn print_mode(mode: &OutputMode, index: usize, current: bool) {
+fn print_mode(mode: &Mode, index: usize, current: bool) {
     let current = if current { "\t>" } else { "\t " };
     let prefered = if mode.prefered() { "(*)" } else { "" };
     println!(

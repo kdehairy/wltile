@@ -23,16 +23,19 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for StateWrapper {
             Head { head } => {
                 debug!("Found head {}", head.id());
                 wrapper.state.write().unwrap().add_head(head);
-
-                if let Err(err) = wrapper.update_tx.send_timeout((), Duration::from_secs(1)) {
-                    error!("Failed to send config update after attaching a head: {err}");
-                }
             }
             Done { serial } => {
                 debug!("serial: {}", serial);
-                wrapper.state.write().unwrap().set_serial(serial);
+                let mut configurations = wrapper.state.write().unwrap();
+                configurations.set_serial(serial);
+                if configurations.is_dirty()
+                    && let Err(err) = wrapper.update_tx.send_timeout((), Duration::from_secs(1))
+                {
+                    error!("Failed to send config update after attaching a head: {err}");
+                } else {
+                    configurations.set_dirty(false);
+                }
             }
-            //Finished => {},
             _ => {}
         }
     }

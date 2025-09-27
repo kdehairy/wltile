@@ -1,25 +1,31 @@
 mod layout_graph;
 
+use tracing::debug;
+
 use crate::{
     functions::position::layout_graph::{LayoutGraph, Node},
     wl_config::Config,
     wlr_client::{
         self,
+        errors::ClientError,
         output::config_writer::{HeadUpdateRequest, UpdateRequest},
         point::Point,
     },
 };
 
-pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), String> {
-    let configs = client.configurations();
-    let heads = configs.heads()?;
+pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), ClientError> {
+    debug!("received config: {config}");
+    let configs = client.configurations_read_lock();
+    let heads = configs.read().heads()?;
 
     let mut layout_graph = LayoutGraph::default();
     for target in config.targets() {
+        if target.position.is_none() {
+            continue;
+        }
         let reference_name = &target.position.as_ref().unwrap().reference;
         let ref_head = heads
             .find(reference_name)
-            //.cloned() //Why cloning makes the wlr_head invalid argument for wayland `enable_head()`?!
             .ok_or("reference output does not exist")?;
         layout_graph.ensure_node(Node::from(ref_head));
 
@@ -27,7 +33,6 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), String> 
         let alignment = target.position.as_ref().unwrap().alignment;
         let target_head = heads
             .find(&target.name)
-            //.cloned()
             .ok_or("target output does not exist")?;
         layout_graph.add_edge_with_target(
             reference_name,
@@ -43,9 +48,9 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), String> 
     let mut head_requests: Vec<HeadUpdateRequest> = Vec::with_capacity(layout_graph.len());
     for (node, _) in &layout_graph {
         head_requests.push(HeadUpdateRequest {
-            head: heads.find(&node.name).unwrap().output_head(),
+            head_id: heads.find(&node.name).unwrap().id(),
             position: Some(node.position),
-            mode: None,
+            mode_id: None,
             scale: None,
             rotation: None,
         });
@@ -60,16 +65,16 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), String> 
             head.position().1.saturating_sub(offset.1),
         );
         head_requests.push(HeadUpdateRequest {
-            head: head.output_head(),
+            head_id: head.id(),
             position: Some(new_position),
-            mode: None,
+            mode_id: None,
             scale: None,
             rotation: None,
         });
     }
 
     let request = UpdateRequest {
-        serial: client.configurations().serial(),
+        serial: client.configurations_read_lock().read().serial(),
         head_requests,
     };
 

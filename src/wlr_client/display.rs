@@ -28,10 +28,11 @@ use wayland_protocols::xdg::shell::client::{
     xdg_wm_base::XdgWmBase,
 };
 
-use crate::wlr_client::ConnectionManager;
 use crate::wlr_client::errors::ClientError;
+use crate::wlr_client::output::heads::Head;
 use crate::wlr_client::output::wlr_head::OutputHead;
 use crate::wlr_client::shmem::Shmem;
+use crate::wlr_client::{ConfigurationsReadLock, ConnectionManager};
 
 #[derive(Debug, PartialEq)]
 enum State {
@@ -90,6 +91,7 @@ pub struct DisplayServer {
     wl_compositor: WlCompositor,
     xdg_wm_base: XdgWmBase,
     state: AsyncState,
+    configs_lock: ConfigurationsReadLock,
 }
 
 // We are assuming color format ARGB8888
@@ -99,7 +101,10 @@ const BACKGROUND: u8 = 128;
 const BORDER_SIZE: usize = 25;
 
 impl DisplayServer {
-    pub(super) fn start(conn_man: &mut ConnectionManager) -> Result<Self, ClientError> {
+    pub(super) fn start(
+        conn_man: &mut ConnectionManager,
+        configs_lock: ConfigurationsReadLock,
+    ) -> Result<Self, ClientError> {
         let mut queue: EventQueue<StateWrapper> = conn_man.new_queue();
         let queue_handle = queue.handle();
         let wl_shm: WlShm = conn_man.bind_global(&queue_handle, 2..=2, ())?;
@@ -158,17 +163,14 @@ impl DisplayServer {
             wl_compositor,
             xdg_wm_base,
             state: display_state,
+            configs_lock,
         };
         debug!("all is configured for display server");
 
         Ok(display_server)
     }
 
-    pub(crate) fn write(
-        &mut self,
-        text: &str,
-        output_head: Option<&OutputHead>,
-    ) -> Result<(), ClientError> {
+    pub(crate) fn write(&mut self, text: &str, head: Option<&Head>) -> Result<(), ClientError> {
         let (buff, width, height) = rasterize_txt(text);
         if buff.len() > self.sh_mem.size {
             error!(
@@ -188,16 +190,19 @@ impl DisplayServer {
 
         let mut stored_surface = None;
         let mut rw_lock = self.state.write().unwrap();
-        if let Some(o) = output_head.as_ref()
-            && let Some(wl_output) = rw_lock.wl_output_from_output_head(o) {
-                for s in &mut rw_lock.surfaces {
-                    if let Some(so) = s.output.as_ref() && so.id() == wl_output.id() {
-                            stored_surface = Some(s);
-                            break;
-
-                    }
+        if let Some(h) = head.as_ref()
+            && let Some(o) = self.configs_lock.read().get_head(h.id())
+            && let Some(wl_output) = rw_lock.wl_output_from_output_head(o)
+        {
+            for s in &mut rw_lock.surfaces {
+                if let Some(so) = s.output.as_ref()
+                    && so.id() == wl_output.id()
+                {
+                    stored_surface = Some(s);
+                    break;
                 }
             }
+        }
 
         if let Some(s) = stored_surface {
             unsafe {
@@ -216,7 +221,8 @@ impl DisplayServer {
         } else {
             drop(rw_lock);
             let mut wl_output = None;
-            if let Some(oh) = output_head.as_ref() {
+            if let Some(h) = head.as_ref()
+            && let Some(oh) = self.configs_lock.read().get_head(h.id()) {
                 wl_output = match self.state.read().unwrap().wl_output_from_output_head(oh) {
                     Some(o) => Some(o),
                     None => {

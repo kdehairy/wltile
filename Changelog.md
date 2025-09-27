@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Daemon mode.
+- Config file for automatic setup.
+
 ## [v1.1.2]
 ### Added
 - pick outputs by serial number, name or make/brand.
