@@ -78,7 +78,7 @@ pub enum Commands {
             value_name = "CONFIG",
             long = "config",
             short = 'c',
-            help = "config file path",
+            help = "config file path. default: ${XDG_CONFIG_HOME}/config.toml",
             required = false
         )]
         config: Option<String>,
@@ -86,7 +86,7 @@ pub enum Commands {
             value_name = "LOG",
             long = "log",
             short = 'l',
-            help = "log file path",
+            help = "log file path. default:  ${XDG_STATE_HOME}/logs.log",
             required = false
         )]
         log: Option<String>,
@@ -94,7 +94,7 @@ pub enum Commands {
             value_name = "ERR",
             long = "err",
             short = 'e',
-            help = "error log file path",
+            help = "error log file path. default:  ${XDG_STATE_HOME}/errors.log",
             required = false
         )]
         err_log: Option<String>,

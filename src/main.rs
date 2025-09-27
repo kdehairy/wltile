@@ -151,10 +151,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let xdg_dirs = xdg::BaseDirectories::with_prefix("wltile");
             let tmp_dir = env::temp_dir();
 
-            let config_path = match config {
-                Some(path) => PathBuf::from(path),
-                None => xdg_dirs.place_config_file("config.yaml")?,
+            let config_path = if let Some(path) = config {
+                PathBuf::from(path)
+            } else {
+                let default_path = xdg_dirs.place_config_file("config.yaml")?;
+                fs::File::create_new(&default_path)?;
+                default_path
             };
+
             let log_path = match log {
                 Some(path) => PathBuf::from(path),
                 None => xdg_dirs.place_state_file("logs.log")?,

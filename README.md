@@ -1,6 +1,10 @@
 # Overview
 `wltile` is a cli tool that positions outputs/displays for wlroots based compositors.
 
+If run in daemon mode, it listens to changes in output displays; displays removed and displays
+connected. When that happens, it reads desired configurations from the config.toml file and applies
+them, wnen applicable.
+
 # Install
 ## Cargo
 ```sh
@@ -15,7 +19,7 @@ paru wltile
 ```
 
 # Usage
-```
+```sh
 wltile <COMMAND>
 
 Commands:
@@ -46,7 +50,7 @@ DP-2:
 ```
 
 ## Show
-```
+```sh
 wltile show [OUTPUT]
 
 Arguments:
@@ -95,7 +99,7 @@ Modes are always shown ordered from the highest resolution and referesh rate,
 to the lowest. This makes the ordinals stable between runs.
 
 ## Position
-```
+```sh
 wltile position <TARGET_OUTPUT> <RELATION> <REFERENCE_OUTPUT> [ALIGNMENT]
 
 Arguments:
@@ -115,7 +119,7 @@ $ wltile position DP-2 left-of eDP-1 align-bottom
 ```
 
 ## Set
-```
+```sh
 wltile set <TARGET_OUTPUT> <PROPERTY> <VALUE>
 
 Arguments:
@@ -160,4 +164,51 @@ $ wltile set DP-2 scale 1.5
 
 $ wltile set DP-2 rotation 270
 
+```
+
+## Daemon
+```sh
+wltile daemon [OPTIONS]
+
+Options:
+  -c, --config <CONFIG>  config file path. default: ${XDG_CONFIG_HOME}/config.toml
+  -l, --log <LOG>        log file path. default:  ${XDG_STATE_HOME}/logs.log
+  -e, --err <ERR>        error log file path. default:  ${XDG_STATE_HOME}/errors.log
+  -d, --systemd          If the daemon is managed by systemd
+  -h, --help             Print help
+```
+
+Starts wltile in daemon mode.
+
+In daemon mode, it listens to changes in output displays; displays removed and displays connected.
+When that happens, it reads desired configurations from the config.toml file and applies them, wnen
+applicable.
+
+The config file has this specifications:
+```toml
+[<taret_output>]
+scale = <value> #optional
+mode = <value> #optional
+rotation = <value> #optional
+position = "<relation> <reference_output> <alignment>"
+```
+
+Example config file:
+```toml
+# this laptop
+[eDP-1]
+scale = 2
+
+# my screen at home
+[dell]
+position = "left-of eDP-1 align-bottom"
+
+# my screen at office
+[phillips]
+position = "right-of eDP-1 align-bottom"
+
+# my third vertical screen (serial number)
+[B5BTNH3]
+position = "right-of eDP-1 align-bottom"
+rotation = -270
 ```
