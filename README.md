@@ -190,7 +190,7 @@ The config file has this specifications:
 scale = <value> #optional
 mode = <value> #optional
 rotation = <value> #optional
-position = "<relation> <reference_output> <alignment>"
+position = "<relation> <reference_output> <alignment>" #optinal
 ```
 
 Example config file:
