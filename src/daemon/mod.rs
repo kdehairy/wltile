@@ -112,16 +112,3 @@ fn reload_configs(config_file: &Path, client: &Client) {
         error!("failed to apply configurations in file: {err}");
     }
 }
-
-#[cfg(test)]
-mod test {
-    use std::path::PathBuf;
-
-    use crate::daemon;
-
-    #[test]
-    fn test_daemon() {
-        let config_path = PathBuf::from("/home/kdehairy/test_config.toml");
-        let _ = daemon::daemon_main(config_path);
-    }
-}

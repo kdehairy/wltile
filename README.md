@@ -209,6 +209,6 @@ position = "right-of eDP-1 align-bottom"
 
 # my third vertical screen (serial number)
 [B5BTNH3]
-position = "right-of eDP-1 align-bottom"
+position = "top-of eDP-1 align-right"
 rotation = -270
 ```
