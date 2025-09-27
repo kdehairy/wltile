@@ -6,7 +6,7 @@ use std::{
 
 use libc::SIGHUP;
 use signal_hook::{consts::TERM_SIGNALS, flag, iterator::Signals};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, info, trace};
 
 use crate::{
     functions,
@@ -16,7 +16,7 @@ use crate::{
 
 #[allow(clippy::needless_pass_by_value)]
 pub fn daemon_main(config_file: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    trace!("daemon started");
+    info!("daemon started");
     let term_now = Arc::new(AtomicBool::new(false));
     for sig in TERM_SIGNALS {
         // term_now is initially false. No effect

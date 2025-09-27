@@ -54,6 +54,7 @@ impl Dispatch<ZwlrOutputHeadV1, ()> for StateWrapper {
                     head.position = Point(x, y);
                 }
                 Event::Finished => {
+                    debug!("head {} finished", head.id());
                     kill_me_please = true;
                     if let Err(err) = wrapper.update_tx.send_timeout((), Duration::from_secs(1)) {
                         error!("Failed to send config update after detaching a head: {err}");

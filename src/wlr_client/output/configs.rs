@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
 use crate::wlr_client::{
@@ -10,7 +10,7 @@ use crate::wlr_client::{
 
 use super::wlr_head::OutputHead;
 use super::wlr_mode::OutputMode;
-use tracing::debug;
+use tracing::{debug, warn};
 use wayland_client::backend::ObjectId;
 use wayland_client::Proxy;
 use wayland_protocols_wlr::output_management::v1::client::{
@@ -23,6 +23,7 @@ pub struct Configurations {
     heads: HashMap<u32, OutputHead>,
     modes: HashMap<u32, OutputMode>,
     serial: u32,
+    dirty: AtomicBool,
 }
 
 impl Configurations {
@@ -46,6 +47,7 @@ impl Configurations {
         let id = self.latest_id.fetch_add(1, Ordering::Relaxed);
         debug!("adding head {} with id {id}", head.id());
         self.heads.insert(id, OutputHead::new(head));
+        self.set_dirty(true);
         id
     }
 
@@ -84,6 +86,7 @@ impl Configurations {
         if let Some(id) = self.to_mode_idx(object_id) {
             self.modes.remove(&id)
         } else {
+            warn!("No Idx mapping for the mode {object_id}");
             None
         }
     }
@@ -140,5 +143,13 @@ impl Configurations {
                 msg: "no modes found for this head".to_string(),
             })
         }
+    }
+
+    pub(super) fn set_dirty(&mut self, value: bool) {
+        self.dirty.store(value, Ordering::Relaxed);
+    }
+
+    pub(crate) fn is_dirty(&self) -> bool {
+        self.dirty.load(Ordering::Relaxed)
     }
 }

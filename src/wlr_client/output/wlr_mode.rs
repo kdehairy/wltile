@@ -31,6 +31,7 @@ impl Dispatch<ZwlrOutputModeV1, ()> for StateWrapper {
                 Event::Refresh { refresh } => mode.refresh = refresh,
                 Event::Preferred => mode.prefered = true,
                 Event::Finished => {
+                    trace!("receieved Finish event for {}", mode.wl_id());
                     kill_me_please = true;
                 }
                 _ => {}
