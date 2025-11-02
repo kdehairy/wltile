@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+## [v1.2.1]
+### Fixed
+- Bug trying to create new config file even if exists in daemon mode.
 
 ## [v1.2.0]
 ### Added
@@ -69,7 +72,8 @@
 - position two displays relative to each other either left or right.
 - while positioning the displays, align them to bottom or top.
 
-[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.2.0...main
+[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.2.1...main
+[v1.2.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.2.0...v1.2.1
 [v1.2.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.1.2...v1.2.0
 [v1.1.2]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.1.1...v1.1.2
 [v1.1.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.1.0...v1.1.1
