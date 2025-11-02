@@ -518,6 +518,7 @@ fn rasterize_txt(txt: &str) -> (Vec<u8>, usize, usize) {
         clippy::cast_possible_truncation,
         clippy::as_conversions
     )]
+    // calculate the text width and height based on font metrics for each character
     let (txt_w, txt_h) = {
         let mut txt_h: usize = 0;
         let mut txt_w: usize = 0;
@@ -546,6 +547,7 @@ fn rasterize_txt(txt: &str) -> (Vec<u8>, usize, usize) {
     let mut x_offset = BORDER_SIZE;
     let y_offset = BORDER_SIZE;
 
+    // rendering the grayscale text pixel buffer in the middle of the overall buffer (with borders)
     #[allow(
         clippy::cast_sign_loss,
         clippy::cast_possible_truncation,

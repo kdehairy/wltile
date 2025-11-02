@@ -155,7 +155,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 PathBuf::from(path)
             } else {
                 let default_path = xdg_dirs.place_config_file("config.yaml")?;
-                fs::File::create_new(&default_path)?;
+                match fs::exists(&default_path) {
+                    Ok(false) => {fs::File::create_new(&default_path)?;},
+                    Err(err) => panic!("{err}"),
+                    _ => (),
+                }
                 default_path
             };
 
