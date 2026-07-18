@@ -27,7 +27,7 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), ClientEr
         let ref_head = heads
             .find(reference_name)
             .ok_or("reference output does not exist")?;
-        layout_graph.ensure_node(Node::from(ref_head));
+        layout_graph.ensure_node(Node::try_from(ref_head)?);
 
         let relation = target.position.as_ref().unwrap().relation;
         let alignment = target.position.as_ref().unwrap().alignment;
@@ -36,7 +36,7 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), ClientEr
             .ok_or("target output does not exist")?;
         layout_graph.add_edge_with_target(
             reference_name,
-            Node::from(target_head),
+            Node::try_from(target_head)?,
             relation,
             alignment,
         );

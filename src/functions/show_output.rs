@@ -29,7 +29,7 @@ fn print_modes(head: &Head) {
     let mut sorted = head.modes().clone();
     sorted.sort_by(|a, b| b.cmp(a));
     for (i, mode) in sorted.iter().enumerate() {
-        print_mode(mode, i, current_mode == mode);
+        print_mode(mode, i, current_mode == Some(mode));
     }
 }
 
@@ -59,15 +59,16 @@ fn print_physical_size(head: &Head) {
 
 #[allow(clippy::print_stdout)]
 fn print_refresh(head: &Head) {
-    println!(
-        "Refresh Rate: {} kHz",
-        f64::from(head.mode().refresh()).div(1000_f64).round()
-    );
+    match head.mode() {
+        Some(mode) => println!("Refresh Rate: {} kHz", f64::from(mode.refresh()).div(1000_f64).round()),
+        None => println!("Refresh Rate: N/A"),
+    }
 }
 
 #[allow(clippy::print_stdout)]
 fn print_name(head: &Head) {
-    println!("Name: {}", head.name());
+    let suffix = if head.enabled() { "" } else { " (disabled)" };
+    println!("Name: {}{suffix}", head.name());
 }
 
 #[allow(clippy::print_stdout)]
@@ -83,7 +84,10 @@ fn print_make(head: &Head) {
 
 #[allow(clippy::print_stdout)]
 fn print_size(head: &Head) {
-    println!("Size: {} x {}", head.mode().size().0, head.mode().size().1,);
+    match head.mode() {
+        Some(mode) => println!("Size: {} x {}", mode.size().0, mode.size().1),
+        None => println!("Size: N/A"),
+    }
     println!("Scale: {}", head.scale());
 }
 

@@ -89,7 +89,7 @@ pub struct Head {
     name: String,
     description: String,
     physical_size: Point,
-    current_mode: Mode,
+    current_mode: Option<Mode>,
     modes: Vec<Mode>,
     enabled: bool,
     position: Point,
@@ -103,25 +103,30 @@ pub struct Head {
 impl Head {
     pub fn new(
         output_head: &OutputHead,
-        output_mode: &OutputMode,
+        output_mode: Option<&OutputMode>,
         configs: &Configurations,
     ) -> Result<Self, ClientError> {
-        let mode_id = configs
-            .to_mode_idx(output_mode.wl_id())
-            .ok_or("No current mode id")?;
         let head_id = configs.to_head_idx(&output_head.id()).ok_or("No head id")?;
         let modes = configs.get_head_modes(head_id)?;
+        let current_mode = output_mode
+            .map(|output_mode| -> Result<Mode, ClientError> {
+                let mode_id = configs
+                    .to_mode_idx(output_mode.wl_id())
+                    .ok_or("No current mode id")?;
+                Ok(Mode {
+                    id: mode_id,
+                    size: output_mode.size(),
+                    refresh: output_mode.refresh(),
+                    prefered: output_mode.prefered(),
+                })
+            })
+            .transpose()?;
         Ok(Head {
             id: head_id,
             name: output_head.name().to_string(),
             description: output_head.description().to_string(),
             physical_size: output_head.physical_size(),
-            current_mode: Mode {
-                id: mode_id,
-                size: output_mode.size(),
-                refresh: output_mode.refresh(),
-                prefered: output_mode.prefered(),
-            },
+            current_mode,
             enabled: output_head.enabled(),
             position: output_head.position(),
             make: output_head.make().to_string(),
@@ -137,8 +142,8 @@ impl Head {
         self.id
     }
 
-    pub fn mode(&self) -> &Mode {
-        &self.current_mode
+    pub fn mode(&self) -> Option<&Mode> {
+        self.current_mode.as_ref()
     }
 
     pub fn name(&self) -> &str {
@@ -182,18 +187,20 @@ impl Head {
     }
 
     #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
-    pub fn scaled_corrected_size(&self) -> Point {
-        let hight = f64::from(self.mode().size().1) / self.scale();
+    pub fn scaled_corrected_size(&self) -> Result<Point, ClientError> {
+        let mode = self.mode().ok_or("no current mode; cannot compute size")?;
+
+        let hight = f64::from(mode.size().1) / self.scale();
         let hight = hight.round() as i32;
 
-        let width = f64::from(self.mode().size().0) / self.scale();
+        let width = f64::from(mode.size().0) / self.scale();
         let width = width.round() as i32;
 
-        if self.is_vertical() {
+        Ok(if self.is_vertical() {
             Point(hight, width)
         } else {
             Point(width, hight)
-        }
+        })
     }
 
     fn is_vertical(&self) -> bool {
@@ -209,13 +216,14 @@ impl Head {
 
 impl Display for Head {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let size = self.mode().map_or_else(|| "N/A".to_string(), |mode| mode.size().to_string());
         write!(
             f,
             "{} => {} {} {} @ {}",
             self.name(),
             self.make(),
             self.model(),
-            self.current_mode.size(),
+            size,
             self.position()
         )
     }

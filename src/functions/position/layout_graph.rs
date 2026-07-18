@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, hash_map};
 
 use crate::{
     wl_config::{Alignment, Relation},
-    wlr_client::{output::heads::Head, point::Point},
+    wlr_client::{errors::ClientError, output::heads::Head, point::Point},
 };
 
 #[derive(Debug, PartialEq, Hash, Eq)]
@@ -20,14 +20,17 @@ pub struct Node {
     pub(super) height: i32,
 }
 
-impl From<&Head> for Node {
-    fn from(head: &Head) -> Self {
-        Self {
+impl TryFrom<&Head> for Node {
+    type Error = ClientError;
+
+    fn try_from(head: &Head) -> Result<Self, Self::Error> {
+        let size = head.scaled_corrected_size()?;
+        Ok(Self {
             name: head.name().into(),
             position: head.position(),
-            width: head.scaled_corrected_size().0,
-            height: head.scaled_corrected_size().1,
-        }
+            width: size.0,
+            height: size.1,
+        })
     }
 }
 

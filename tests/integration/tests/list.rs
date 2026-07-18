@@ -73,7 +73,7 @@ fn list_reflects_position_after_positioning() {
 }
 
 #[test]
-fn list_omits_disabled_output() {
+fn list_shows_disabled_output() {
     let mut comp = Compositor::new();
     comp.add_output(); // HEADLESS-2
     comp.disable_output("HEADLESS-2");
@@ -82,5 +82,7 @@ fn list_omits_disabled_output() {
     assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("HEADLESS-1"), "stdout: {stdout}");
-    assert!(!stdout.contains("HEADLESS-2"), "stdout: {stdout}");
+    assert!(stdout.contains("HEADLESS-2 (disabled)"), "stdout: {stdout}");
+    assert!(stdout.contains("Size: N/A"), "stdout: {stdout}");
+    assert!(stdout.contains("Refresh Rate: N/A"), "stdout: {stdout}");
 }

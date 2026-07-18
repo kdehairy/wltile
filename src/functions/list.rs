@@ -18,15 +18,14 @@ const LIGHT_GRAY_COLOR: Color = Color::TrueColor {
 #[allow(clippy::print_stdout)]
 pub fn exec(heads: &Heads) {
     for head in heads.heads() {
-        if head.enabled() {
-            println!("{}:", head.name().bold());
-            print_serial_number(head);
-            print_make(head);
-            print_size(head);
-            print_physical_size(head);
-            print_refresh(head);
-            print_position(head);
-        }
+        let suffix = if head.enabled() { "" } else { " (disabled)" };
+        println!("{}{suffix}:", head.name().bold());
+        print_serial_number(head);
+        print_make(head);
+        print_size(head);
+        print_physical_size(head);
+        print_refresh(head);
+        print_position(head);
     }
 }
 
@@ -46,10 +45,10 @@ fn print_physical_size(head: &Head) {
 
 #[allow(clippy::print_stdout)]
 fn print_refresh(head: &Head) {
-    println!(
-        "\tRefresh Rate: {} kHz",
-        f64::from(head.mode().refresh()).div(1000_f64).round()
-    );
+    match head.mode() {
+        Some(mode) => println!("\tRefresh Rate: {} kHz", f64::from(mode.refresh()).div(1000_f64).round()),
+        None => println!("\tRefresh Rate: N/A"),
+    }
 }
 
 #[allow(clippy::print_stdout)]
@@ -59,12 +58,15 @@ fn print_make(head: &Head) {
 
 #[allow(clippy::print_stdout)]
 fn print_size(head: &Head) {
-    println!(
-        "\tSize: {} x {} {}",
-        head.mode().size().0,
-        head.mode().size().1,
-        format!("scale: {}", head.scale()).color(LIGHT_GRAY_COLOR),
-    );
+    match head.mode() {
+        Some(mode) => println!(
+            "\tSize: {} x {} {}",
+            mode.size().0,
+            mode.size().1,
+            format!("scale: {}", head.scale()).color(LIGHT_GRAY_COLOR),
+        ),
+        None => println!("\tSize: N/A"),
+    }
 }
 
 #[allow(clippy::print_stdout)]
