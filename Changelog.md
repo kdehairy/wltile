@@ -1,6 +1,12 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Crashing when listing displays with a disabled one amongst them.
+
+### Added
+- Show disabled displays when list.
+
 ## [v1.2.1]
 ### Fixed
 - Bug trying to create new config file even if exists in daemon mode.
