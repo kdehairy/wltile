@@ -122,6 +122,16 @@ impl Compositor {
         swaymsg::parse_outputs(&result.stdout)
     }
 
+    /// Disables a connected output via sway's IPC.
+    pub fn disable_output(&self, name: &str) {
+        let result = self.swaymsg(&["output", name, "disable"]);
+        assert!(
+            result.status.success(),
+            "swaymsg output disable failed: {}",
+            String::from_utf8_lossy(&result.stderr),
+        );
+    }
+
     fn swaymsg(&self, args: &[&str]) -> Output {
         Command::new("swaymsg")
             .arg("-s")
