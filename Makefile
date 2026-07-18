@@ -1,4 +1,4 @@
-.PHONY: build release run clean integration-test
+.PHONY: build release run clean test unit-test integration-test
 
 build:
 	@cargo build
@@ -12,6 +12,11 @@ run:
 
 check:
 	@cargo clippy
+
+test: unit-test integration-test
+
+unit-test:
+	@cargo test --bin wltile
 
 integration-test:
 	@docker build -t wltile-integration -f tests/Dockerfile .
