@@ -31,6 +31,7 @@ impl FromStr for Config {
                 mode: t.mode,
                 rotation: t.rotation,
                 position,
+                active: None,
             };
             config.add_target(t);
         }

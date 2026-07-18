@@ -42,6 +42,7 @@ pub fn exec(config: &Config, client: &Client) -> Result<(), ClientError> {
             position: None,
             mode_id,
             rotation: transform,
+            enabled: target.active,
         });
     }
 

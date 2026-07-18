@@ -135,6 +135,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err("Expected number identifier for the rotation")?;
                     }
                 }
+                Property::Active => {
+                    if let Ok(desired) = value.trim().parse::<bool>() {
+                        target.active = Some(desired);
+                    } else {
+                        Err("Expected 'true' or 'false' for active")?;
+                    }
+                }
             }
 
             config.add_target(target);

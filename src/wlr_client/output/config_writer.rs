@@ -72,6 +72,7 @@ pub struct HeadUpdateRequest {
     pub mode_id: Option<u32>,
     pub scale: Option<f64>,
     pub rotation: Option<Transform>,
+    pub enabled: Option<bool>,
 }
 
 impl Display for HeadUpdateRequest {
@@ -90,6 +91,10 @@ impl Display for HeadUpdateRequest {
 
         if let Some(rotation) = self.rotation {
             write!(f, "\trotation: {rotation:?}")?;
+        }
+
+        if let Some(enabled) = self.enabled {
+            write!(f, "\tenabled: {enabled}")?;
         }
 
         Ok(())
@@ -163,6 +168,15 @@ impl ConfigWriter {
                 .ok_or("could not find head")?;
             let wlr_head = head.wlr_head();
             debug!("configuring head with name '{}'", head.name());
+            if head_request.enabled == Some(false) {
+                if head.enabled() {
+                    debug!("disabling head '{}'", head.name());
+                    output_configuration.disable_head(wlr_head);
+                    appy_please = true;
+                }
+                continue;
+            }
+
             let head_configuration =
                 output_configuration.enable_head(wlr_head, &self.queue_handle, ());
             if Self::reconcile_head_configs(&head_configuration, configs_lock, head, head_request) {
@@ -205,6 +219,11 @@ impl ConfigWriter {
         request: &HeadUpdateRequest,
     ) -> bool {
         let mut dirty = false;
+
+        if request.enabled == Some(true) && !head.enabled() {
+            debug!("Head '{}' is being enabled", head.name());
+            dirty = true;
+        }
 
         if let Some(position) = request.position
             && head.position() != position

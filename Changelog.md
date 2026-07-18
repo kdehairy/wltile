@@ -6,6 +6,7 @@
 
 ### Added
 - Show disabled displays when list.
+- Set a display enabled or disabled.
 
 ## [v1.2.1]
 ### Fixed

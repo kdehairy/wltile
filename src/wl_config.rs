@@ -138,6 +138,7 @@ pub struct Target {
     pub scale: Option<f64>,
     pub mode: Option<usize>,
     pub rotation: Option<i32>,
+    pub active: Option<bool>,
 }
 impl Target {
     pub(crate) fn new(name: String) -> Self {
@@ -162,6 +163,9 @@ impl Display for Target {
         }
         if let Some(rotation) = self.rotation {
             writeln!(f, "\trotation: {rotation}")?;
+        }
+        if let Some(active) = self.active {
+            writeln!(f, "\tactive: {active}")?;
         }
 
         Ok(())

@@ -53,6 +53,7 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), ClientEr
             mode_id: None,
             scale: None,
             rotation: None,
+            enabled: None,
         });
     }
 
@@ -70,6 +71,7 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), ClientEr
             mode_id: None,
             scale: None,
             rotation: None,
+            enabled: None,
         });
     }
 

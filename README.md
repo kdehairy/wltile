@@ -49,6 +49,8 @@ DP-2:
 	Position: (0, 0)
 ```
 
+Disabled outputs are still listed, suffixed with `(disabled)`.
+
 ## Show
 ```sh
 wltile show [OUTPUT]
@@ -124,7 +126,7 @@ wltile set <TARGET_OUTPUT> <PROPERTY> <VALUE>
 
 Arguments:
   <TARGET_OUTPUT>
-  <PROPERTY>       [possible values: mode, scale, rotation]
+  <PROPERTY>       [possible values: mode, scale, rotation, active]
   <VALUE>
 
 Options:
@@ -163,6 +165,12 @@ $ wltile set DP-2 mode 3
 $ wltile set DP-2 scale 1.5
 
 $ wltile set DP-2 rotation 270
+
+# disable an output
+$ wltile set DP-2 active false
+
+# re-enable it
+$ wltile set DP-2 active true
 
 ```
 

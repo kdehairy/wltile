@@ -113,6 +113,7 @@ pub enum Property {
     Mode,
     Scale,
     Rotation,
+    Active,
 }
 
 // Postfix is functionally needed here

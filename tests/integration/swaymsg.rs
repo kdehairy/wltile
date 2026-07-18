@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct Output {
     pub name: String,
     pub active: bool,
+    #[serde(default)]
     pub scale: f64,
     pub rect: Rect,
     pub current_mode: Option<Mode>,
