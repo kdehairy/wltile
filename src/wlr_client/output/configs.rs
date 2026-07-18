@@ -30,13 +30,19 @@ impl Configurations {
     pub fn heads(&self) -> Result<Heads, ClientError> {
         let mut heads = Heads::default();
         for output_head in self.heads.values() {
-            let current_mode_idx = self
-                .to_mode_idx(output_head.current_mode_id())
-                .ok_or("Current mode is not found!")?;
             let current_mode = self
-                .modes
-                .get(&current_mode_idx)
-                .ok_or("Current mode is not found")?;
+                .to_mode_idx(output_head.current_mode_id())
+                .and_then(|idx| self.modes.get(&idx));
+            let Some(current_mode) = current_mode else {
+                // A disabled head is never sent a `current_mode` event, so having none
+                // is expected. An enabled head without one is unexpected — surface it.
+                if output_head.enabled() {
+                    warn!("enabled head {} has no current mode; skipping", output_head.name());
+                } else {
+                    debug!("disabled head {} has no current mode; skipping", output_head.name());
+                }
+                continue;
+            };
             let head = Head::new(output_head, current_mode, self)?;
             heads.insert(head.name().to_string(), head);
         }
