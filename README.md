@@ -1,9 +1,13 @@
 # Overview
-`wltile` is a cli tool that positions outputs/displays for wlroots based compositors.
+`wltile` is a CLI tool for managing outputs/displays on wlroots based compositors, using the
+`zwlr-output-management-v1` Wayland protocol. It can list connected outputs, inspect their modes,
+position them relative to one another, and set properties like mode, scale, rotation, and
+active/disabled state.
 
-If run in daemon mode, it listens to changes in output displays; displays removed and displays
-connected. When that happens, it reads desired configurations from the config.toml file and applies
-them, wnen applicable.
+It can be used interactively via one-shot commands, or run as a daemon: in daemon mode, it listens
+for output changes (displays connected or removed), reads the desired configuration from a
+`config.toml` file, and applies it automatically. The config can be reloaded on the fly with
+`SIGHUP`, without restarting the daemon.
 
 # Install
 ## Cargo
@@ -189,7 +193,7 @@ Options:
 Starts wltile in daemon mode.
 
 In daemon mode, it listens to changes in output displays; displays removed and displays connected.
-When that happens, it reads desired configurations from the config.toml file and applies them, wnen
+When that happens, it reads desired configurations from the config.toml file and applies them, when
 applicable.
 
 The config file has this specifications:
