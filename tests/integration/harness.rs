@@ -75,16 +75,23 @@ impl Compositor {
     }
 
     /// Creates one virtual output and returns its name (e.g. `"HEADLESS-1"`).
+    ///
+    /// Sway's headless backend always starts with one output (`HEADLESS-1`)
+    /// already present, so the first call only waits for it instead of
+    /// issuing a redundant `create_output` (which would otherwise spawn an
+    /// untracked extra output).
     pub fn add_output(&mut self) -> String {
         self.output_count += 1;
         let expected = format!("HEADLESS-{}", self.output_count);
 
-        let result = self.swaymsg(&["create_output"]);
-        assert!(
-            result.status.success(),
-            "swaymsg create_output failed: {}",
-            String::from_utf8_lossy(&result.stderr),
-        );
+        if !self.outputs().iter().any(|o| o.name == expected) {
+            let result = self.swaymsg(&["create_output"]);
+            assert!(
+                result.status.success(),
+                "swaymsg create_output failed: {}",
+                String::from_utf8_lossy(&result.stderr),
+            );
+        }
 
         let deadline = Instant::now() + APPEAR_TIMEOUT;
         loop {

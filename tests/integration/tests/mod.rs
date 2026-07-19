@@ -1,3 +1,4 @@
+mod daemon;
 mod list;
 mod position;
 mod set;

@@ -4,19 +4,19 @@ use crate::harness::Compositor;
 #[test]
 fn position_right_of_align_bottom() {
     let mut comp = Compositor::new();
-    comp.add_output();
-    comp.add_output();
+    let h1 = comp.add_output();
+    let h2 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", "HEADLESS-2", "right-of", "HEADLESS-1"]);
+    let out = comp.run_wltile(&["position", h2.as_str(), "right-of", h1.as_str()]);
     assert!(
         out.status.success(),
-        "expected `position HEADLESS-2 right-of HEADLESS-1` to succeed, but it failed with stderr: {}",
+        "expected `position {h2} right-of {h1}` to succeed, but it failed with stderr: {}",
         String::from_utf8_lossy(&out.stderr),
     );
 
     let outputs = comp.outputs();
-    let h1 = find_output(&outputs, "HEADLESS-1");
-    let h2 = find_output(&outputs, "HEADLESS-2");
+    let h1 = find_output(&outputs, &h1);
+    let h2 = find_output(&outputs, &h2);
 
     assert_eq!(
         h2.rect.x,
@@ -37,19 +37,19 @@ fn position_right_of_align_bottom() {
 #[test]
 fn position_right_of_align_top() {
     let mut comp = Compositor::new();
-    comp.add_output();
-    comp.add_output();
+    let h1 = comp.add_output();
+    let h2 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", "HEADLESS-2", "right-of", "HEADLESS-1", "align-top"]);
+    let out = comp.run_wltile(&["position", h2.as_str(), "right-of", h1.as_str(), "align-top"]);
     assert!(
         out.status.success(),
-        "expected `position HEADLESS-2 right-of HEADLESS-1 align-top` to succeed, but it failed with stderr: {}",
+        "expected `position {h2} right-of {h1} align-top` to succeed, but it failed with stderr: {}",
         String::from_utf8_lossy(&out.stderr),
     );
 
     let outputs = comp.outputs();
-    let h1 = find_output(&outputs, "HEADLESS-1");
-    let h2 = find_output(&outputs, "HEADLESS-2");
+    let h1 = find_output(&outputs, &h1);
+    let h2 = find_output(&outputs, &h2);
 
     assert_eq!(
         h2.rect.x,
@@ -68,19 +68,19 @@ fn position_right_of_align_top() {
 #[test]
 fn position_left_of_align_bottom() {
     let mut comp = Compositor::new();
-    comp.add_output();
-    comp.add_output();
+    let h1 = comp.add_output();
+    let h2 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", "HEADLESS-2", "left-of", "HEADLESS-1"]);
+    let out = comp.run_wltile(&["position", h2.as_str(), "left-of", h1.as_str()]);
     assert!(
         out.status.success(),
-        "expected `position HEADLESS-2 left-of HEADLESS-1` to succeed, but it failed with stderr: {}",
+        "expected `position {h2} left-of {h1}` to succeed, but it failed with stderr: {}",
         String::from_utf8_lossy(&out.stderr),
     );
 
     let outputs = comp.outputs();
-    let h1 = find_output(&outputs, "HEADLESS-1");
-    let h2 = find_output(&outputs, "HEADLESS-2");
+    let h1 = find_output(&outputs, &h1);
+    let h2 = find_output(&outputs, &h2);
 
     assert_eq!(
         h2.rect.x + h2.rect.width,
@@ -101,19 +101,19 @@ fn position_left_of_align_bottom() {
 #[test]
 fn position_top_of_align_left() {
     let mut comp = Compositor::new();
-    comp.add_output();
-    comp.add_output();
+    let h1 = comp.add_output();
+    let h2 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", "HEADLESS-2", "top-of", "HEADLESS-1", "align-left"]);
+    let out = comp.run_wltile(&["position", h2.as_str(), "top-of", h1.as_str(), "align-left"]);
     assert!(
         out.status.success(),
-        "expected `position HEADLESS-2 top-of HEADLESS-1 align-left` to succeed, but it failed with stderr: {}",
+        "expected `position {h2} top-of {h1} align-left` to succeed, but it failed with stderr: {}",
         String::from_utf8_lossy(&out.stderr),
     );
 
     let outputs = comp.outputs();
-    let h1 = find_output(&outputs, "HEADLESS-1");
-    let h2 = find_output(&outputs, "HEADLESS-2");
+    let h1 = find_output(&outputs, &h1);
+    let h2 = find_output(&outputs, &h2);
 
     assert_eq!(
         h2.rect.y + h2.rect.height,
@@ -132,19 +132,19 @@ fn position_top_of_align_left() {
 #[test]
 fn position_bottom_of_align_left() {
     let mut comp = Compositor::new();
-    comp.add_output();
-    comp.add_output();
+    let h1 = comp.add_output();
+    let h2 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", "HEADLESS-2", "bottom-of", "HEADLESS-1", "align-left"]);
+    let out = comp.run_wltile(&["position", h2.as_str(), "bottom-of", h1.as_str(), "align-left"]);
     assert!(
         out.status.success(),
-        "expected `position HEADLESS-2 bottom-of HEADLESS-1 align-left` to succeed, but it failed with stderr: {}",
+        "expected `position {h2} bottom-of {h1} align-left` to succeed, but it failed with stderr: {}",
         String::from_utf8_lossy(&out.stderr),
     );
 
     let outputs = comp.outputs();
-    let h1 = find_output(&outputs, "HEADLESS-1");
-    let h2 = find_output(&outputs, "HEADLESS-2");
+    let h1 = find_output(&outputs, &h1);
+    let h2 = find_output(&outputs, &h2);
 
     assert_eq!(
         h2.rect.y,
@@ -163,12 +163,12 @@ fn position_bottom_of_align_left() {
 #[test]
 fn position_unknown_target_fails() {
     let mut comp = Compositor::new();
-    comp.add_output();
+    let h1 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", "nonexistent", "right-of", "HEADLESS-1"]);
+    let out = comp.run_wltile(&["position", "nonexistent", "right-of", h1.as_str()]);
     assert!(
         !out.status.success(),
-        "expected `position nonexistent right-of HEADLESS-1` to fail for an unknown target, but it succeeded with stdout:\n{}",
+        "expected `position nonexistent right-of {h1}` to fail for an unknown target, but it succeeded with stdout:\n{}",
         String::from_utf8_lossy(&out.stdout),
     );
 }
@@ -176,12 +176,12 @@ fn position_unknown_target_fails() {
 #[test]
 fn position_unknown_reference_fails() {
     let mut comp = Compositor::new();
-    comp.add_output();
+    let h1 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", "HEADLESS-1", "right-of", "nonexistent"]);
+    let out = comp.run_wltile(&["position", h1.as_str(), "right-of", "nonexistent"]);
     assert!(
         !out.status.success(),
-        "expected `position HEADLESS-1 right-of nonexistent` to fail for an unknown reference, but it succeeded with stdout:\n{}",
+        "expected `position {h1} right-of nonexistent` to fail for an unknown reference, but it succeeded with stdout:\n{}",
         String::from_utf8_lossy(&out.stdout),
     );
 }
