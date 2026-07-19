@@ -1,3 +1,4 @@
+use std::fs;
 use std::time::Duration;
 
 use super::find_output;
@@ -317,5 +318,76 @@ position = "right-of {h1} align-bottom"
         "expected {h2} to be positioned using {h1}'s NEW (post-scale) geometry from this \
          single reload, final outputs: {:?}",
         comp.outputs(),
+    );
+}
+
+#[test]
+fn daemon_exits_gracefully_on_sigterm() {
+    let mut comp = Compositor::new();
+    let _h1 = comp.add_output();
+
+    let config_path = comp.write_config("");
+    let mut daemon = comp.spawn_daemon(&config_path);
+
+    // Give the daemon a moment to install its signal handlers before we send
+    // one — see daemon_position_uses_fresh_geometry_after_property_change_in_same_reload
+    // for why this matters: SIGTERM's default disposition (terminate) applies
+    // until the daemon reaches its own `Signals::new(&sigs)` call.
+    std::thread::sleep(Duration::from_millis(500));
+
+    daemon.terminate();
+    let status = daemon.wait_for_exit(RELOAD_TIMEOUT);
+
+    assert!(
+        status.is_some(),
+        "expected the daemon to exit within {RELOAD_TIMEOUT:?} of receiving SIGTERM",
+    );
+    assert!(
+        status.unwrap().success(),
+        "expected the daemon to exit cleanly (status 0) after a graceful SIGTERM shutdown",
+    );
+}
+
+#[test]
+fn daemon_second_start_fails_when_pid_file_exists() {
+    let comp = Compositor::new();
+
+    let config_path = comp.write_config("");
+
+    // Pre-seed a stale pid file where the daemon (non-systemd path) expects
+    // it: $XDG_RUNTIME_DIR/wltile/daemon.pid.
+    let wltile_runtime_dir = comp.runtime_dir().join("wltile");
+    fs::create_dir_all(&wltile_runtime_dir).expect("failed to create runtime subdir");
+    fs::write(wltile_runtime_dir.join("daemon.pid"), "999999999")
+        .expect("failed to seed stale pid file");
+
+    // Isolate XDG_STATE_HOME so the (non-systemd) startup path's log/error
+    // file placement doesn't touch the real user's state directory. The pid
+    // file guard runs before any of that is used, so this never actually
+    // gets written to.
+    let state_home = comp.runtime_dir().join("state");
+
+    let out = comp.run_wltile_with_env(
+        &[
+            "daemon",
+            "--config",
+            config_path.to_str().expect("config path must be utf-8"),
+        ],
+        &[(
+            "XDG_STATE_HOME",
+            state_home.to_str().expect("state home must be utf-8"),
+        )],
+    );
+
+    assert!(
+        !out.status.success(),
+        "expected `daemon --config ...` to refuse to start with an existing pid file, but it \
+         succeeded with stdout:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("pid file"),
+        "expected the error to mention the pre-existing pid file, got stderr:\n{stderr}",
     );
 }
