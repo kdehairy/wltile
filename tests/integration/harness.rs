@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Child, Command, ExitStatus, Output, Stdio};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -110,6 +110,13 @@ impl Compositor {
 
     /// Runs the `wltile` binary against this compositor with the given args.
     pub fn run_wltile(&self, args: &[&str]) -> Output {
+        self.run_wltile_with_env(args, &[])
+    }
+
+    /// Like [`Self::run_wltile`], but with additional environment variables set
+    /// (e.g. to isolate `XDG_STATE_HOME` so the daemon doesn't touch the real
+    /// user's state directory).
+    pub fn run_wltile_with_env(&self, args: &[&str], extra_env: &[(&str, &str)]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_wltile"))
             .env(
                 "WAYLAND_DISPLAY",
@@ -118,6 +125,7 @@ impl Compositor {
                     .expect("failed to get wayland display"),
             )
             .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+            .envs(extra_env.iter().copied())
             .args(args)
             .output()
             .expect("failed to run wltile")
@@ -127,6 +135,98 @@ impl Compositor {
     pub fn outputs(&self) -> Vec<swaymsg::Output> {
         let result = self.swaymsg(&["-t", "get_outputs"]);
         swaymsg::parse_outputs(&result.stdout)
+    }
+
+    /// The isolated `XDG_RUNTIME_DIR` this compositor instance runs under.
+    pub fn runtime_dir(&self) -> &Path {
+        &self.runtime_dir
+    }
+
+    /// Writes a TOML daemon config into this instance's runtime dir and returns its path.
+    pub fn write_config(&self, contents: &str) -> PathBuf {
+        let path = self.runtime_dir.join("config.toml");
+        fs::write(&path, contents).expect("failed to write daemon config");
+        path
+    }
+
+    /// Spawns `wltile daemon --systemd` against this compositor, returning a handle
+    /// used to signal and observe it. `--systemd` keeps the process in the
+    /// foreground instead of forking, so it stays a controllable child here.
+    pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
+        let log = File::create(self.runtime_dir.join("daemon.log"))
+            .expect("failed to create daemon log");
+        let child = Command::new(env!("CARGO_BIN_EXE_wltile"))
+            .env(
+                "WAYLAND_DISPLAY",
+                self.wayland_sock
+                    .file_name()
+                    .expect("failed to get wayland display"),
+            )
+            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+            .args([
+                "-vvv",
+                "daemon",
+                "--systemd",
+                "--config",
+                config_path.to_str().expect("config path must be utf-8"),
+            ])
+            .stdout(log.try_clone().expect("failed to clone daemon log"))
+            .stderr(log)
+            .spawn()
+            .expect("failed to spawn wltile daemon");
+
+        Daemon {
+            pid: child.id(),
+            child,
+        }
+    }
+
+    /// Polls `outputs()` until `predicate` is satisfied or `timeout` elapses.
+    /// Returns whether the predicate was satisfied.
+    pub fn wait_for_outputs(
+        &self,
+        timeout: Duration,
+        predicate: impl Fn(&[swaymsg::Output]) -> bool,
+    ) -> bool {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if predicate(&self.outputs()) {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            thread::sleep(POLL_INTERVAL);
+        }
+    }
+
+    /// Repeatedly sends SIGHUP to `daemon` and polls `outputs()` until `predicate`
+    /// is satisfied or `timeout` elapses. Returns whether the predicate was satisfied.
+    ///
+    /// The daemon's Wayland client only dispatches/polls every 500ms, so its
+    /// internal view of the output-manager `serial` can lag behind what
+    /// `swaymsg` already reports on the compositor side. A single SIGHUP sent
+    /// right after observing a prior change via `swaymsg` can race that lag:
+    /// the daemon builds its next commit from a stale serial and the
+    /// compositor silently rejects it. Resending on each poll absorbs this
+    /// without depending on exact timing.
+    pub fn reload_until(
+        &self,
+        daemon: &Daemon,
+        timeout: Duration,
+        predicate: impl Fn(&[swaymsg::Output]) -> bool,
+    ) -> bool {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if predicate(&self.outputs()) {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            daemon.reload();
+            thread::sleep(POLL_INTERVAL);
+        }
     }
 
     /// Disables a connected output via sway's IPC.
@@ -155,6 +255,58 @@ impl Drop for Compositor {
         self.process.kill().ok();
         self.process.wait().ok();
         fs::remove_dir_all(&self.runtime_dir).ok();
+    }
+}
+
+/// Handle to a `wltile daemon` process spawned via [`Compositor::spawn_daemon`].
+pub struct Daemon {
+    child: Child,
+    pid: u32,
+}
+
+impl Daemon {
+    /// Sends SIGHUP, asking the daemon to reload and reapply its config file.
+    pub fn reload(&self) {
+        self.signal(libc::SIGHUP);
+    }
+
+    /// Sends SIGTERM, asking the daemon to shut down gracefully.
+    pub fn terminate(&self) {
+        self.signal(libc::SIGTERM);
+    }
+
+    /// Polls for process exit until `timeout` elapses.
+    pub fn wait_for_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Ok(Some(status)) = self.child.try_wait() {
+                return Some(status);
+            }
+            if Instant::now() >= deadline {
+                return None;
+            }
+            thread::sleep(POLL_INTERVAL);
+        }
+    }
+
+    /// Whether the process is still running.
+    pub fn is_alive(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+    }
+
+    fn signal(&self, sig: libc::c_int) {
+        // SAFETY: `self.pid` is this process's own child; signaling it is safe.
+        let pid: libc::pid_t = self.pid.cast_signed();
+        unsafe {
+            libc::kill(pid, sig);
+        }
+    }
+}
+
+impl Drop for Daemon {
+    fn drop(&mut self) {
+        self.child.kill().ok();
+        self.child.wait().ok();
     }
 }
 
