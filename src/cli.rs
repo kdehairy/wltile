@@ -102,7 +102,7 @@ pub enum Commands {
             value_name = "SYSTEMD",
             long = "systemd",
             short = 'd',
-            help = "If the daemon is managed by systemd",
+            help = "If the daemon is managed by systemd"
         )]
         systemd: bool,
     },

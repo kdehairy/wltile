@@ -40,7 +40,13 @@ fn position_right_of_align_top() {
     let h1 = comp.add_output();
     let h2 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", h2.as_str(), "right-of", h1.as_str(), "align-top"]);
+    let out = comp.run_wltile(&[
+        "position",
+        h2.as_str(),
+        "right-of",
+        h1.as_str(),
+        "align-top",
+    ]);
     assert!(
         out.status.success(),
         "expected `position {h2} right-of {h1} align-top` to succeed, but it failed with stderr: {}",
@@ -135,7 +141,13 @@ fn position_bottom_of_align_left() {
     let h1 = comp.add_output();
     let h2 = comp.add_output();
 
-    let out = comp.run_wltile(&["position", h2.as_str(), "bottom-of", h1.as_str(), "align-left"]);
+    let out = comp.run_wltile(&[
+        "position",
+        h2.as_str(),
+        "bottom-of",
+        h1.as_str(),
+        "align-left",
+    ]);
     assert!(
         out.status.success(),
         "expected `position {h2} bottom-of {h1} align-left` to succeed, but it failed with stderr: {}",

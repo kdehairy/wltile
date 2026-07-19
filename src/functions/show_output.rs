@@ -60,7 +60,10 @@ fn print_physical_size(head: &Head) {
 #[allow(clippy::print_stdout)]
 fn print_refresh(head: &Head) {
     match head.mode() {
-        Some(mode) => println!("Refresh Rate: {} kHz", f64::from(mode.refresh()).div(1000_f64).round()),
+        Some(mode) => println!(
+            "Refresh Rate: {} kHz",
+            f64::from(mode.refresh()).div(1000_f64).round()
+        ),
         None => println!("Refresh Rate: N/A"),
     }
 }

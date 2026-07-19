@@ -5,9 +5,7 @@ use crate::{
     wl_config::Config,
     wlr_client::{
         Client,
-        output::
-            config_writer::{HeadUpdateRequest, UpdateRequest}
-        ,
+        output::config_writer::{HeadUpdateRequest, UpdateRequest},
     },
 };
 

@@ -11,8 +11,8 @@ use crate::wlr_client::{
 use super::wlr_head::OutputHead;
 use super::wlr_mode::OutputMode;
 use tracing::{debug, warn};
-use wayland_client::backend::ObjectId;
 use wayland_client::Proxy;
+use wayland_client::backend::ObjectId;
 use wayland_protocols_wlr::output_management::v1::client::{
     zwlr_output_head_v1::ZwlrOutputHeadV1, zwlr_output_mode_v1::ZwlrOutputModeV1,
 };

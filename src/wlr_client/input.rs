@@ -1,7 +1,5 @@
 use std::{
-    sync::{
-        Arc, RwLock,
-    },
+    sync::{Arc, RwLock},
     thread,
     time::Duration,
 };

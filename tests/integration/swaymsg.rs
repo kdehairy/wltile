@@ -29,6 +29,10 @@ pub struct Mode {
 
 /// Parses the JSON emitted by `swaymsg -t get_outputs`.
 pub fn parse_outputs(json: &[u8]) -> Vec<Output> {
-    serde_json::from_slice(json)
-        .unwrap_or_else(|e| panic!("failed to parse swaymsg output: {e}\n{}", String::from_utf8_lossy(json)))
+    serde_json::from_slice(json).unwrap_or_else(|e| {
+        panic!(
+            "failed to parse swaymsg output: {e}\n{}",
+            String::from_utf8_lossy(json)
+        )
+    })
 }

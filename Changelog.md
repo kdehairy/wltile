@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Fixed
 - Crashing when listing displays with a disabled one amongst them.
+- Race condition in daemon mode reload configs.
 
 ### Added
 - Show disabled displays when list.

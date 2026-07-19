@@ -153,8 +153,8 @@ impl Compositor {
     /// used to signal and observe it. `--systemd` keeps the process in the
     /// foreground instead of forking, so it stays a controllable child here.
     pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
-        let log = File::create(self.runtime_dir.join("daemon.log"))
-            .expect("failed to create daemon log");
+        let log =
+            File::create(self.runtime_dir.join("daemon.log")).expect("failed to create daemon log");
         let child = Command::new(env!("CARGO_BIN_EXE_wltile"))
             .env(
                 "WAYLAND_DISPLAY",

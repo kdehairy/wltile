@@ -163,7 +163,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 let default_path = xdg_dirs.place_config_file("config.toml")?;
                 match fs::exists(&default_path) {
-                    Ok(false) => {fs::File::create_new(&default_path)?;},
+                    Ok(false) => {
+                        fs::File::create_new(&default_path)?;
+                    }
                     Err(err) => panic!("{err}"),
                     _ => (),
                 }

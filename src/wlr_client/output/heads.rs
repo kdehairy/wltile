@@ -216,7 +216,9 @@ impl Head {
 
 impl Display for Head {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let size = self.mode().map_or_else(|| "N/A".to_string(), |mode| mode.size().to_string());
+        let size = self
+            .mode()
+            .map_or_else(|| "N/A".to_string(), |mode| mode.size().to_string());
         write!(
             f,
             "{} => {} {} {} @ {}",

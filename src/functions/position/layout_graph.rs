@@ -51,8 +51,10 @@ impl LayoutGraph {
     }
 
     fn get_edges_for_node(&self, name: &str) -> Option<&HashSet<Edge<String>>> {
-        if let Some(edges) = self.graph.get(name) && !edges.is_empty() {
-                return Some(edges);
+        if let Some(edges) = self.graph.get(name)
+            && !edges.is_empty()
+        {
+            return Some(edges);
         }
         None
     }
@@ -202,7 +204,7 @@ impl LayoutGraph {
         for node in self.nodes.values_mut() {
             node.position.0 = node.position.0.saturating_sub(offset_from_origin.0);
             node.position.1 = node.position.1.saturating_sub(offset_from_origin.1);
-        };
+        }
         Ok(offset_from_origin)
     }
 

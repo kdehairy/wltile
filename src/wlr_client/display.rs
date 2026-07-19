@@ -222,7 +222,8 @@ impl DisplayServer {
             drop(rw_lock);
             let mut wl_output = None;
             if let Some(h) = head.as_ref()
-            && let Some(oh) = self.configs_lock.read().get_head(h.id()) {
+                && let Some(oh) = self.configs_lock.read().get_head(h.id())
+            {
                 wl_output = match self.state.read().unwrap().wl_output_from_output_head(oh) {
                     Some(o) => Some(o),
                     None => {

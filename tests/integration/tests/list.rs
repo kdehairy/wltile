@@ -85,7 +85,13 @@ fn list_reflects_position_after_positioning() {
     let h1 = comp.add_output();
     let h2 = comp.add_output();
 
-    let pos_out = comp.run_wltile(&["position", h2.as_str(), "right-of", h1.as_str(), "align-top"]);
+    let pos_out = comp.run_wltile(&[
+        "position",
+        h2.as_str(),
+        "right-of",
+        h1.as_str(),
+        "align-top",
+    ]);
     assert!(
         pos_out.status.success(),
         "expected `position {h2} right-of {h1} align-top` to succeed, but it failed with stderr: {}",

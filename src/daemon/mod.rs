@@ -93,8 +93,9 @@ fn reload_configs(config_file: &Path, client: &Client) {
         for target in config.targets() {
             if heads.find(&target.name).is_some() {
                 if let Some(pos) = target.position.as_ref()
-                    && heads.find(&pos.reference).is_some() {
-                        filtered_config.add_target(target.clone());
+                    && heads.find(&pos.reference).is_some()
+                {
+                    filtered_config.add_target(target.clone());
                 }
                 if target.position.is_none() {
                     filtered_config.add_target(target.clone());
