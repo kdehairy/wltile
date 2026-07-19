@@ -7,7 +7,7 @@ pub mod shmem;
 pub(crate) mod input;
 pub(crate) mod output;
 
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use std::thread;
 use std::time::Duration;
 
@@ -32,6 +32,22 @@ struct StateWrapper {
     update_tx: Sender<()>,
 }
 
+/// Owns the main event queue used to keep the shared `Configurations` cache
+/// up to date. Shared (via `Arc<Mutex<_>>`) between the periodic background
+/// dispatcher and any caller that needs an on-demand refresh — see
+/// [`Client::refresh_configurations`].
+struct MainDispatcher {
+    queue: EventQueue<StateWrapper>,
+    wrapper: StateWrapper,
+}
+
+impl MainDispatcher {
+    fn dispatch(&mut self) -> Result<usize, ClientError> {
+        self.queue.flush()?;
+        Ok(self.queue.dispatch_pending(&mut self.wrapper)?)
+    }
+}
+
 #[derive(Clone)]
 pub struct ConfigurationsReadLock {
     configurations: AsyncState,
@@ -52,12 +68,13 @@ pub struct Client {
     connection_manager: ConnectionManager,
     input_server: Option<InputServer>,
     update_rx: Receiver<()>,
+    dispatcher: Arc<Mutex<MainDispatcher>>,
 }
 
 impl Client {
     pub fn new() -> Result<Client, ClientError> {
         let mut conn_man = ConnectionManager::connect()?;
-        let mut queue: EventQueue<StateWrapper> = conn_man.new_queue();
+        let queue: EventQueue<StateWrapper> = conn_man.new_queue();
         let queue_handle = queue.handle();
 
         let state = Arc::new(RwLock::new(Configurations::default()));
@@ -66,32 +83,30 @@ impl Client {
         conn_man.sync()?;
 
         let (tx, rx) = crossbeam_channel::unbounded();
-        queue.dispatch_pending(&mut StateWrapper {
-            state: state.clone(),
-            update_tx: tx.clone(),
-        })?;
+        let dispatcher = Arc::new(Mutex::new(MainDispatcher {
+            queue,
+            wrapper: StateWrapper {
+                state: state.clone(),
+                update_tx: tx.clone(),
+            },
+        }));
+        dispatcher.lock().unwrap().dispatch()?;
         debug!("configurations received");
 
         thread::spawn({
-            let mut state = StateWrapper {
-                state: state.clone(),
-                update_tx: tx.clone(),
-            };
-            move || loop {
-                thread::sleep(Duration::from_millis(500));
+            let dispatcher = dispatcher.clone();
+            move || {
+                loop {
+                    thread::sleep(Duration::from_millis(500));
 
-                // flushing all out going requests, if any
-                if let Err(err) = queue.flush() {
-                    error!("Failed to flush out going events: {}", err);
-                }
-
-                match queue.dispatch_pending(&mut state) {
-                    Ok(size) => {
-                        if size > 0 {
-                            trace!("Dispatched {size} pending events");
+                    match dispatcher.lock().unwrap().dispatch() {
+                        Ok(size) => {
+                            if size > 0 {
+                                trace!("Dispatched {size} pending events");
+                            }
                         }
+                        Err(err) => error!("Error dispatching events: {}", err),
                     }
-                    Err(err) => error!("Error dispatching events: {}", err),
                 }
             }
         });
@@ -104,6 +119,7 @@ impl Client {
             connection_manager: conn_man,
             input_server: None,
             update_rx: rx,
+            dispatcher,
         })
     }
 
@@ -115,6 +131,20 @@ impl Client {
 
     pub fn subscribe(&self) -> Receiver<()> {
         self.update_rx.clone()
+    }
+
+    /// Forces an immediate dispatch of any already-buffered output-manager
+    /// events, refreshing the shared `Configurations` cache.
+    ///
+    /// The periodic background dispatch only runs every ~500ms, decoupled
+    /// from this client's own `update_configurations` calls (which commit
+    /// through a separate, dedicated event queue). A caller that applies a
+    /// property change and then immediately needs to compute geometry from
+    /// it (e.g. positioning one head relative to another whose scale it just
+    /// changed) would otherwise read stale, pre-change state from the cache.
+    pub(crate) fn refresh_configurations(&self) -> Result<(), ClientError> {
+        self.dispatcher.lock().unwrap().dispatch()?;
+        Ok(())
     }
 
     /// Updates the outputs configurations to match the provided request.

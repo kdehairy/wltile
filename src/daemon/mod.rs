@@ -108,6 +108,14 @@ fn reload_configs(config_file: &Path, client: &Client) {
         error!("failed to apply configurations in file: {err}");
     }
 
+    // Force the shared head cache to catch up with the property changes just
+    // applied above before computing positions from it: set_property::exec's
+    // commit goes through its own, separate event queue, so without this the
+    // cache used below could still reflect each head's pre-change geometry.
+    if let Err(err) = client.refresh_configurations() {
+        error!("failed to refresh configurations before positioning: {err}");
+    }
+
     if let Err(err) = functions::position::exec(&filtered_config, client) {
         error!("failed to apply configurations in file: {err}");
     }

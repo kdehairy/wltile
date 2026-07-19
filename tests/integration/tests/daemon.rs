@@ -262,3 +262,60 @@ position = "right-of DP-99 align-bottom"
         comp.outputs(),
     );
 }
+
+/// Regression test for a race in `daemon::reload_configs`: it calls
+/// `set_property::exec` then immediately `position::exec` in the same pass.
+/// `position::exec` reads head geometry (e.g. scale, to compute
+/// `scaled_corrected_size`) from the shared `Configurations` cache, which is
+/// only refreshed by a background thread polling the main Wayland event
+/// queue every ~500ms — decoupled from `set_property::exec`'s own commit,
+/// which goes through a separate `ConfigWriter`-owned event queue. So a
+/// single reload that both rescales a head and positions another head
+/// relative to it can compute the new position using the rescaled head's
+/// STALE, pre-change geometry.
+///
+/// A single SIGHUP (no resend) is used deliberately: resending would let a
+/// later, lucky retry paper over the race once the background poll happens
+/// to catch up, defeating the point of isolating this one reload's outcome.
+#[test]
+fn daemon_position_uses_fresh_geometry_after_property_change_in_same_reload() {
+    let mut comp = Compositor::new();
+    let h1 = comp.add_output();
+    let h2 = comp.add_output();
+
+    let config_path = comp.write_config("");
+    let daemon = comp.spawn_daemon(&config_path);
+
+    // Give the daemon a moment to finish connecting and registering its
+    // signal handlers before we send anything.
+    std::thread::sleep(Duration::from_millis(500));
+
+    comp.write_config(&format!(
+        r#"
+[{h1}]
+scale = 2
+
+[{h2}]
+position = "right-of {h1} align-bottom"
+"#,
+    ));
+    daemon.reload();
+
+    // A single SIGHUP with a generous timeout — plenty of time for this one
+    // reload_configs invocation to fully complete, but no resend, so a lucky
+    // later retry can't paper over the race we're isolating.
+    let applied = comp.wait_for_outputs(RELOAD_TIMEOUT, |outputs| {
+        let h1 = find_output(outputs, &h1);
+        let h2 = find_output(outputs, &h2);
+        (h1.scale - 2.0).abs() < 0.01
+            && h2.rect.x == h1.rect.x + h1.rect.width
+            && h2.rect.y + h2.rect.height == h1.rect.y + h1.rect.height
+    });
+
+    assert!(
+        applied,
+        "expected {h2} to be positioned using {h1}'s NEW (post-scale) geometry from this \
+         single reload, final outputs: {:?}",
+        comp.outputs(),
+    );
+}
