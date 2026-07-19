@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [v1.3.0]
 ### Fixed
 - Crashing when listing displays with a disabled one amongst them.
 - Race condition in daemon mode reload configs.
@@ -80,7 +82,8 @@
 - position two displays relative to each other either left or right.
 - while positioning the displays, align them to bottom or top.
 
-[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.2.1...main
+[unreleased]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.3.0...main
+[v1.3.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.2.1...v1.3.0
 [v1.2.1]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.2.0...v1.2.1
 [v1.2.0]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.1.2...v1.2.0
 [v1.1.2]: https://gitlab.com/eldoheiri/wltile/-/compare/v1.1.1...v1.1.2
