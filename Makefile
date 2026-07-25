@@ -1,5 +1,7 @@
 .PHONY: build release run clean test unit-test integration-test verify
 
+INTEGRATION_TEST_THREADS ?=
+
 verify:
 	@RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
 build:
@@ -28,7 +30,9 @@ integration-test:
 	# --cap-add=SYS_NICE is required: the sway binary carries a
 	# cap_sys_nice=ep file capability, which is only granted if SYS_NICE is
 	# in the container's bounding set (it isn't, by Docker's default).
-	@docker run --rm --shm-size=1g --cap-add=SYS_NICE wltile-integration
+	@docker run --rm --shm-size=1g --cap-add=SYS_NICE \
+		$(if $(INTEGRATION_TEST_THREADS),-e RUST_TEST_THREADS=$(INTEGRATION_TEST_THREADS),) \
+		wltile-integration
 
 clean:
 	@cargo clean
