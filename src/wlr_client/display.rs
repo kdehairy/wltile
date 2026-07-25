@@ -36,8 +36,6 @@ use crate::wlr_client::{ConfigurationsReadLock, ConnectionManager};
 
 #[derive(Debug, PartialEq)]
 enum State {
-    /// Nothing to draw.
-    Wait,
     /// frame buffer is all set and ready to go.
     Ready,
     /// frame buffer committed to the compositor.
@@ -253,9 +251,6 @@ impl DisplayServer {
                 .xdg_wm_base
                 .get_xdg_surface(&wl_surface, &self.queue_handle, ());
             let xdg_toplevel = xdg_surface.get_toplevel(&self.queue_handle, ());
-            // We need to do a commit after asiging a role, then we will get the configure event.
-            wl_surface.commit();
-            xdg_toplevel.set_fullscreen(wl_output.as_ref());
 
             unsafe {
                 std::ptr::copy(
@@ -272,18 +267,32 @@ impl DisplayServer {
             self.sh_mem_offset = self
                 .sh_mem_offset
                 .saturating_add(isize::try_from(buff.len()).unwrap());
-            let mut surface = Surface {
+
+            let commit_surface = wl_surface.clone();
+            let fullscreen_toplevel = xdg_toplevel.clone();
+
+            let surface = Surface {
                 wl_surface,
                 wl_buff,
                 sh_mem_offset: self.sh_mem_offset,
                 xdg_surface,
                 xdg_toplevel,
-                state: State::Wait,
-                output: wl_output,
+                state: State::Ready,
+                output: wl_output.clone(),
                 transform: None,
             };
-            surface.state = State::Ready;
+
+            // Register the surface BEFORE the role-assigning commit that makes
+            // the compositor emit `xdg_surface::configure`. If we committed
+            // first, the display thread could dispatch that configure before the
+            // surface is tracked here — the handler would find nothing, the
+            // buffer would never be attached, and the surface would stall in
+            // `Ready` forever (blank output + `wait_until_presented` timeout).
             self.state.write().unwrap().surfaces.push(surface);
+
+            // Now assign the top_level role and request the configure.
+            commit_surface.commit();
+            fullscreen_toplevel.set_fullscreen(wl_output.as_ref());
         }
 
         Ok(())
