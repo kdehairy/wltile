@@ -4,6 +4,7 @@ INTEGRATION_TEST_THREADS ?=
 
 verify:
 	@RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
+
 build:
 	@cargo build --verbose
 

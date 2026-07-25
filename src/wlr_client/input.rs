@@ -9,7 +9,7 @@ use tracing::{error, trace};
 use wayland_client::{
     Dispatch, EventQueue, QueueHandle, WEnum,
     protocol::{
-        wl_keyboard::WlKeyboard,
+        wl_keyboard::{KeyState, WlKeyboard},
         wl_seat::{self, Capability, WlSeat},
     },
 };
@@ -148,7 +148,9 @@ impl Dispatch<WlKeyboard, ()> for StateWrapper {
                 state: key_state,
             } => {
                 trace!("key: {}, {:?}", key, key_state);
-                let _ = state.state.read().unwrap().key_pressed_tx.send(key);
+                if let WEnum::Value(KeyState::Pressed) = key_state {
+                    let _ = state.state.read().unwrap().key_pressed_tx.send(key);
+                }
             }
             _ => {}
         }
