@@ -133,8 +133,8 @@ impl Client {
         self.update_rx.clone()
     }
 
-    /// Forces an immediate dispatch of any already-buffered output-manager
-    /// events, refreshing the shared `Configurations` cache.
+    /// Blocks until the shared `Configurations` cache reflects everything the
+    /// compositor has emitted so far, then returns.
     ///
     /// The periodic background dispatch only runs every ~500ms, decoupled
     /// from this client's own `update_configurations` calls (which commit
@@ -143,6 +143,9 @@ impl Client {
     /// it (e.g. positioning one head relative to another whose scale it just
     /// changed) would otherwise read stale, pre-change state from the cache.
     pub(crate) fn refresh_configurations(&self) -> Result<(), ClientError> {
+        self.connection_manager.sync()?;
+        // sync() does not really apply the new changes to the cache. we need
+        // to dispatch what we got in the queue after the sync.
         self.dispatcher.lock().unwrap().dispatch()?;
         Ok(())
     }
