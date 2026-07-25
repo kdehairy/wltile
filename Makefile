@@ -2,6 +2,13 @@
 
 INTEGRATION_TEST_THREADS ?=
 
+# Constrain the integration-test container to match GitHub-hosted runners,
+# which reproduces timing/race behaviour that our faster dev machines hide.
+# Standard ubuntu-latest runners are 4 vCPU / 16G (public) or 2 vCPU / 7G
+# (private). Override on the command line, e.g. INTEGRATION_TEST_CPUS=2.
+INTEGRATION_TEST_CPUS ?= 4
+INTEGRATION_TEST_MEMORY ?= 16g
+
 verify:
 	@RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
 
@@ -32,6 +39,8 @@ integration-test:
 	# cap_sys_nice=ep file capability, which is only granted if SYS_NICE is
 	# in the container's bounding set (it isn't, by Docker's default).
 	@docker run --rm --shm-size=1g --cap-add=SYS_NICE \
+		$(if $(INTEGRATION_TEST_CPUS),--cpus=$(INTEGRATION_TEST_CPUS),) \
+		$(if $(INTEGRATION_TEST_MEMORY),--memory=$(INTEGRATION_TEST_MEMORY),) \
 		$(if $(INTEGRATION_TEST_THREADS),-e RUST_TEST_THREADS=$(INTEGRATION_TEST_THREADS),) \
 		wltile-integration
 
