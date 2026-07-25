@@ -123,36 +123,17 @@ impl Dispatch<WlKeyboard, ()> for StateWrapper {
         _conn: &wayland_client::Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        match event {
-            wayland_client::protocol::wl_keyboard::Event::Keymap { format, fd, size } => {
-                trace!("keymap: {:?}, {:?}, {}", format, fd, size);
+        if let wayland_client::protocol::wl_keyboard::Event::Key {
+            serial: _serial,
+            time: _time,
+            key,
+            state: key_state,
+        } = event
+        {
+            trace!("key: {}, {:?}", key, key_state);
+            if let WEnum::Value(KeyState::Pressed) = key_state {
+                let _ = state.state.read().unwrap().key_pressed_tx.send(key);
             }
-            wayland_client::protocol::wl_keyboard::Event::Enter {
-                serial: _serial,
-                surface: _surface,
-                keys: _keys,
-            } => {
-                trace!("Keyboard focus entered");
-            }
-            wayland_client::protocol::wl_keyboard::Event::Leave {
-                serial: _serial,
-                surface: _surface,
-            } => {
-                trace!("Keyboard focus left");
-                let _ = state.state.read().unwrap().key_pressed_tx.send(0);
-            }
-            wayland_client::protocol::wl_keyboard::Event::Key {
-                serial: _serial,
-                time: _time,
-                key,
-                state: key_state,
-            } => {
-                trace!("key: {}, {:?}", key, key_state);
-                if let WEnum::Value(KeyState::Pressed) = key_state {
-                    let _ = state.state.read().unwrap().key_pressed_tx.send(key);
-                }
-            }
-            _ => {}
         }
     }
 }
