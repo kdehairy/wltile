@@ -1,7 +1,6 @@
 use std::{
     sync::{Arc, RwLock},
     thread,
-    time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender};
@@ -57,17 +56,9 @@ impl InputServer {
             };
 
             move || loop {
-                // no need to pull more than the 60 Hz refresh rate.
-                // specially that what we draw is static in nature
-                thread::sleep(Duration::from_millis(16));
-
-                // flushing all out going requests, if any
-                if let Err(err) = queue.flush() {
-                    error!("Failed to flush out going events: {}", err);
-                }
-
-                if let Err(err) = queue.dispatch_pending(&mut state) {
-                    error!("Error dispatching events: {}", err);
+                if let Err(err) = queue.blocking_dispatch(&mut state) {
+                    error!("Error dispatching input events: {}", err);
+                    break;
                 }
             }
         });

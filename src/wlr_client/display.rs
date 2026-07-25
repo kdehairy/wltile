@@ -138,17 +138,9 @@ impl DisplayServer {
             };
 
             move || loop {
-                // no need to pull more than the 60 Hz refresh rate.
-                // specially that what we draw is static in nature
-                thread::sleep(Duration::from_millis(16));
-
-                // flushing all out going requests, if any
-                if let Err(err) = queue.flush() {
-                    error!("Failed to flush out going events: {}", err);
-                }
-
-                if let Err(err) = queue.dispatch_pending(&mut state) {
-                    error!("Error dispatching events: {}", err);
+                if let Err(err) = queue.blocking_dispatch(&mut state) {
+                    error!("Error dispatching display events: {}", err);
+                    break;
                 }
             }
         });
@@ -232,9 +224,6 @@ impl DisplayServer {
                         });
                     }
                 };
-                if let Some(o) = self.state.read().unwrap().wl_output_from_output_head(oh) {
-                    wl_output = Some(o);
-                }
             }
 
             // Offset into the shared pool where this surface's buffer will lives.
@@ -296,6 +285,12 @@ impl DisplayServer {
             // Now assign the top_level role and request the configure.
             commit_surface.commit();
             fullscreen_toplevel.set_fullscreen(wl_output.as_ref());
+
+            // Flush these requests ourselves. The display thread now blocks in
+            // `blocking_dispatch` and won't flush again until it wakes — but it
+            // can't wake until the configure that this commit triggers arrives.
+            // Without this flush the two would deadlock.
+            self.connection.flush()?;
         }
 
         Ok(())

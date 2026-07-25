@@ -1,5 +1,8 @@
 use core::f64;
 use std::fmt::Display;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender};
@@ -130,22 +133,44 @@ enum Status {
 
 /// Handles passing the desired configurations to the compositor.
 pub struct ConfigWriter {
-    queue: EventQueue<State>,
     queue_handle: QueueHandle<State>,
-    state: State,
+    connection: Connection,
     status_receiver: Receiver<Status>,
+    shutdown: Arc<AtomicBool>,
 }
 
 impl ConfigWriter {
     pub(crate) fn new(conn_man: &ConnectionManager) -> Self {
-        let queue = conn_man.new_queue();
+        let queue: EventQueue<State> = conn_man.new_queue();
+        let queue_handle = queue.handle();
         trace!("configurations writer queue created successfully");
         let (sender, receiver) = crossbeam_channel::unbounded();
+        let shutdown = Arc::new(AtomicBool::new(false));
+
+        thread::spawn({
+            let shutdown = shutdown.clone();
+            let mut queue = queue;
+            let mut state = State { sender };
+            move || {
+                loop {
+                    if let Err(err) = queue.blocking_dispatch(&mut state) {
+                        error!("Error dispatching config-writer events: {}", err);
+                        break;
+                    }
+                    // shutdown polling thread on next wakeup rather than parking 
+                    // on this connection forever.
+                    if shutdown.load(Ordering::Relaxed) {
+                        break;
+                    }
+                }
+            }
+        });
+
         Self {
-            queue_handle: queue.handle(),
-            queue,
-            state: State { sender },
+            queue_handle,
+            connection: conn_man.connection(),
             status_receiver: receiver,
+            shutdown,
         }
     }
 
@@ -186,28 +211,19 @@ impl ConfigWriter {
         if appy_please {
             info!("Applying new configurations");
             output_configuration.apply();
-            let result;
-            match self.queue.roundtrip(&mut self.state) {
-                Err(err) => {
-                    result = Err(ClientError::general(format!(
-                        "error sending request to compositor: {err}"
-                    )));
-                }
-                _ => {
-                    if let Ok(Status::Succeeded) =
-                        self.status_receiver.recv_timeout(Duration::new(5, 0))
-                    {
-                        info!("applied configurations successfully");
-                        result = Ok(());
-                    } else {
-                        error!("failed to apply configurations");
-                        result = Err(ClientError::general(String::from(
-                            "failed to update configurations",
-                        )));
-                    }
-                }
+            // Flush ourselves: the dispatch thread is parked in `poll` and won't
+            // flush this apply until it wakes — which only happens when compositor 
+            // happens to send us some events.
+            self.connection.flush()?;
+            if let Ok(Status::Succeeded) = self.status_receiver.recv_timeout(Duration::from_secs(5))
+            {
+                info!("applied configurations successfully");
+                return Ok(());
             }
-            return result;
+            error!("failed to apply configurations");
+            return Err(ClientError::general(String::from(
+                "failed to update configurations",
+            )));
         }
         Ok(())
     }
@@ -278,5 +294,12 @@ impl ConfigWriter {
         }
 
         dirty
+    }
+}
+
+impl Drop for ConfigWriter {
+    fn drop(&mut self) {
+        // Shutdown the polling thread. not needed anymore
+        self.shutdown.store(true, Ordering::Relaxed);
     }
 }
