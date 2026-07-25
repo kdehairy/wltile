@@ -1,3 +1,6 @@
+[![crates.io](https://img.shields.io/crates/v/wltile.svg)](https://crates.io/crates/wltile)
+[![CI](https://github.com/kdehairy/wltile/actions/workflows/ci.yml/badge.svg)](https://github.com/kdehairy/wltile/actions/workflows/ci.yml)
+
 # Overview
 `wltile` is a CLI tool for managing outputs/displays on wlroots based compositors, using the
 `zwlr-output-management-v1` Wayland protocol. It can list connected outputs, inspect their modes,
