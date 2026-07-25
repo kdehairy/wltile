@@ -27,7 +27,6 @@ use crate::wlr_client::errors::ClientError;
 /// binding more than once to global objects always tears down the previous binding and only the
 /// last is kept functioning. This needs a single point of responsibility to make sure that
 /// different parts of the app do not step on each other's toes.
-#[derive(Clone)]
 pub(crate) struct ConnectionManager {
     connection: Connection,
     globals: Arc<GlobalList>,
@@ -77,8 +76,17 @@ impl ConnectionManager {
     /// Sends a `Sync` request to wayland server and blocks waiting for all messages and requests
     /// to arrive.
     pub(super) fn sync(&self) -> Result<(), ClientError> {
+        Self::sync_connection(&self.connection)
+    }
+
+    /// Returns a clone of the underlying [`Connection`] handle.
+    pub(super) fn connection(&self) -> Connection {
+        self.connection.clone()
+    }
+
+    /// Same as [`ConnectionManager::sync`] but operates on a bare [`Connection`] handle.
+    pub(super) fn sync_connection(conn: &Connection) -> Result<(), ClientError> {
         trace!("syncing with wayland server");
-        let conn = &self.connection;
         let state = Arc::new(SyncData::default());
         let display = conn.display();
 
