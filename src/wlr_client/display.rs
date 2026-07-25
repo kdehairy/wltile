@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::os::fd::AsFd;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tracing::{debug, error, trace};
 use wayland_client::backend::ObjectId;
@@ -92,6 +92,7 @@ pub struct DisplayServer {
     xdg_wm_base: XdgWmBase,
     state: AsyncState,
     configs_lock: ConfigurationsReadLock,
+    connection: Connection,
 }
 
 // We are assuming color format ARGB8888
@@ -164,6 +165,7 @@ impl DisplayServer {
             xdg_wm_base,
             state: display_state,
             configs_lock,
+            connection: conn_man.connection(),
         };
         debug!("all is configured for display server");
 
@@ -285,6 +287,35 @@ impl DisplayServer {
         }
 
         Ok(())
+    }
+
+    /// Blocks until every surface created so far has attached its buffer and committed it to the
+    /// compositor (`State::Committed` or later), or until `timeout` elapses, then drives one
+    /// roundtrip so the commit is guaranteed to have reached and been processed by the server.
+    pub(crate) fn wait_until_presented(&self, timeout: Duration) {
+        let deadline = Instant::now()
+            .checked_add(timeout)
+            .expect("timeout overflowed the clock");
+        loop {
+            let all_committed = self
+                .state
+                .read()
+                .unwrap()
+                .surfaces
+                .iter()
+                .all(|s| matches!(s.state, State::Committed | State::Active));
+            if all_committed {
+                break;
+            }
+            if Instant::now() >= deadline {
+                debug!("Timed out waiting for surfaces to be presented");
+                break;
+            }
+            thread::sleep(Duration::from_millis(4));
+        }
+        if let Err(err) = ConnectionManager::sync_connection(&self.connection) {
+            error!("Failed to sync after committing surfaces: {}", err);
+        }
     }
 }
 
