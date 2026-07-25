@@ -102,6 +102,10 @@ impl ConnectionManager {
             if state.done.load(Ordering::Relaxed) {
                 break;
             }
+            // Normally this hungry tight loop is harmfull. But under integration tests 
+            // with parallel execution and limited CPU on public CI/CD runners, it eats
+            // up CPU scheduling. Hence, yeilding the CPU for a bit.
+            thread::sleep(Duration::from_millis(1));
         }
         trace!("Syncing finished");
 

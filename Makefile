@@ -1,7 +1,9 @@
-.PHONY: build release run clean test unit-test integration-test
+.PHONY: build release run clean test unit-test integration-test verify
 
+verify:
+	@RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
 build:
-	@cargo build
+	@cargo build --verbose
 
 release:
 	@cargo build --release
@@ -9,9 +11,6 @@ release:
 run:
 	@if [ -f ./target/logs.out ]; then rm ./target/logs.out; fi
 	@cargo run
-
-check:
-	@cargo clippy
 
 test: unit-test integration-test
 

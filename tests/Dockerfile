@@ -20,10 +20,11 @@ RUN mkdir -p /run/user/1000 \
 
 WORKDIR /home/testuser/app
 COPY --chown=testuser:testuser . .
+RUN chown testuser:testuser /home/testuser/app
 
 USER testuser
 
 # Pre-fetch dependencies so repeated runs are faster when only source changes.
 RUN cargo fetch
 
-CMD ["cargo", "test", "--test", "integration"]
+CMD ["timeout", "--kill-after=10s", "5m", "cargo", "test", "--test", "integration"]
