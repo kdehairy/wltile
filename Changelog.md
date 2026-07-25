@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Applying geometry changes on stale cached configs.
 
 ## [v1.3.0]
 ### Fixed
