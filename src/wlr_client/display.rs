@@ -236,8 +236,12 @@ impl DisplayServer {
                     wl_output = Some(o);
                 }
             }
+
+            // Offset into the shared pool where this surface's buffer will lives.
+            let buffer_offset = self.sh_mem_offset;
+
             let wl_buff = self.wl_pool.create_buffer(
-                i32::try_from(self.sh_mem_offset).unwrap(),
+                i32::try_from(buffer_offset).unwrap(),
                 i32::try_from(width).unwrap(),
                 i32::try_from(height).unwrap(),
                 i32::try_from(width.saturating_mul(PIXEL_SIZE)).unwrap(),
@@ -259,14 +263,13 @@ impl DisplayServer {
                     // in the shmem.
                     // It's Ok from the whole crate perspective, since we are always going through
                     // the outputs once, and we allocate enough buffer for them all (and a bit more).
-                    self.sh_mem.addr.offset(self.sh_mem_offset),
+                    self.sh_mem.addr.offset(buffer_offset),
                     buff.len(),
                 );
             }
 
-            self.sh_mem_offset = self
-                .sh_mem_offset
-                .saturating_add(isize::try_from(buff.len()).unwrap());
+            self.sh_mem_offset =
+                buffer_offset.saturating_add(isize::try_from(buff.len()).unwrap());
 
             let commit_surface = wl_surface.clone();
             let fullscreen_toplevel = xdg_toplevel.clone();
@@ -274,7 +277,7 @@ impl DisplayServer {
             let surface = Surface {
                 wl_surface,
                 wl_buff,
-                sh_mem_offset: self.sh_mem_offset,
+                sh_mem_offset: buffer_offset,
                 xdg_surface,
                 xdg_toplevel,
                 state: State::Ready,
