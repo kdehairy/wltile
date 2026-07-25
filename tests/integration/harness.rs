@@ -13,6 +13,7 @@ static INSTANCE_COUNTER: AtomicU32 = AtomicU32::new(0);
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const APPEAR_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
+const SWAYMSG_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct Compositor {
     process: Child,
@@ -239,13 +240,33 @@ impl Compositor {
         );
     }
 
+    /// Runs `swaymsg`, bounded by `SWAYMSG_TIMEOUT`.
     fn swaymsg(&self, args: &[&str]) -> Output {
-        Command::new("swaymsg")
-            .arg("-s")
-            .arg(&self.sway_sock)
-            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
-            .args(args)
-            .output()
+        let (tx, rx) = std::sync::mpsc::channel();
+        // `Command::output()` has no built-in timeout.
+        thread::spawn({
+            let sway_sock = self.sway_sock.clone();
+            let runtime_dir = self.runtime_dir.clone();
+            let owned_args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+            move || {
+                let result = Command::new("swaymsg")
+                    .arg("-s")
+                    .arg(&sway_sock)
+                    .env("XDG_RUNTIME_DIR", &runtime_dir)
+                    .args(&owned_args)
+                    .output();
+                // The receiver may already be gone if we timed out; ignore.
+                let _ = tx.send(result);
+            }
+        });
+
+        rx.recv_timeout(SWAYMSG_TIMEOUT)
+            .unwrap_or_else(|_| {
+                panic!(
+                    "swaymsg {args:?} did not respond within {SWAYMSG_TIMEOUT:?} — \
+                     sway's IPC thread is likely starved on this runner",
+                )
+            })
             .expect("swaymsg failed")
     }
 }
