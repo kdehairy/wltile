@@ -14,6 +14,11 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const APPEAR_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 const SWAYMSG_TIMEOUT: Duration = Duration::from_secs(15);
+/// A healthy `wltile` one-shot completes well under a second; wltile bounds its
+/// own compositor waits internally (a few seconds each). This ceiling only
+/// catches a genuine hang (e.g. a Wayland read-coordination stall under CI CPU
+/// contention) and turns it into a fast, labelled failure.
+const WLTILE_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct Compositor {
     process: Child,
@@ -117,19 +122,30 @@ impl Compositor {
     /// Like [`Self::run_wltile`], but with additional environment variables set
     /// (e.g. to isolate `XDG_STATE_HOME` so the daemon doesn't touch the real
     /// user's state directory).
+    ///
+    /// Bounded by `WLTILE_TIMEOUT`
     pub fn run_wltile_with_env(&self, args: &[&str], extra_env: &[(&str, &str)]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_wltile"))
-            .env(
-                "WAYLAND_DISPLAY",
-                self.wayland_sock
-                    .file_name()
-                    .expect("failed to get wayland display"),
-            )
-            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
-            .envs(extra_env.iter().copied())
-            .args(args)
-            .output()
-            .expect("failed to run wltile")
+        let bin = env!("CARGO_BIN_EXE_wltile");
+        let wayland_display = self
+            .wayland_sock
+            .file_name()
+            .expect("failed to get wayland display")
+            .to_owned();
+        let runtime_dir = self.runtime_dir.clone();
+        let owned_env: Vec<(String, String)> = extra_env
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        let owned_args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+
+        run_bounded(WLTILE_TIMEOUT, format!("wltile {owned_args:?}"), move || {
+            Command::new(bin)
+                .env("WAYLAND_DISPLAY", &wayland_display)
+                .env("XDG_RUNTIME_DIR", &runtime_dir)
+                .envs(owned_env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
+                .args(&owned_args)
+                .output()
+        })
     }
 
     /// Returns the current output state reported by the compositor.
@@ -242,33 +258,42 @@ impl Compositor {
 
     /// Runs `swaymsg`, bounded by `SWAYMSG_TIMEOUT`.
     fn swaymsg(&self, args: &[&str]) -> Output {
-        let (tx, rx) = std::sync::mpsc::channel();
-        // `Command::output()` has no built-in timeout.
-        thread::spawn({
-            let sway_sock = self.sway_sock.clone();
-            let runtime_dir = self.runtime_dir.clone();
-            let owned_args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+        let sway_sock = self.sway_sock.clone();
+        let runtime_dir = self.runtime_dir.clone();
+        let owned_args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+
+        run_bounded(
+            SWAYMSG_TIMEOUT,
+            format!("swaymsg {owned_args:?} (sway IPC likely starved)"),
             move || {
-                let result = Command::new("swaymsg")
+                Command::new("swaymsg")
                     .arg("-s")
                     .arg(&sway_sock)
                     .env("XDG_RUNTIME_DIR", &runtime_dir)
                     .args(&owned_args)
-                    .output();
-                // The receiver may already be gone if we timed out; ignore.
-                let _ = tx.send(result);
-            }
-        });
-
-        rx.recv_timeout(SWAYMSG_TIMEOUT)
-            .unwrap_or_else(|_| {
-                panic!(
-                    "swaymsg {args:?} did not respond within {SWAYMSG_TIMEOUT:?} — \
-                     sway's IPC thread is likely starved on this runner",
-                )
-            })
-            .expect("swaymsg failed")
+                    .output()
+            },
+        )
     }
+}
+
+/// Runs a `Command` bounded by `timeout`.
+///
+/// Since `Command::output()` has no built-in timeout, this helper runs it Bounded
+/// instead of waiting forever.
+fn run_bounded<F>(timeout: Duration, label: String, run: F) -> Output
+where
+    F: FnOnce() -> std::io::Result<Output> + Send + 'static,
+{
+    let (tx, rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        // The receiver may already be gone if we timed out; ignore.
+        let _ = tx.send(run());
+    });
+
+    rx.recv_timeout(timeout)
+        .unwrap_or_else(|_| panic!("{label} did not complete within {timeout:?}"))
+        .unwrap_or_else(|err| panic!("{label} failed to run: {err}"))
 }
 
 impl Drop for Compositor {
