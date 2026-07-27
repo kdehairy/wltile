@@ -154,8 +154,14 @@ impl ConfigWriter {
             move || {
                 loop {
                     if let Err(err) = queue.blocking_dispatch(&mut state) {
-                        error!("Error dispatching config-writer events: {}", err);
-                        break;
+                        // A dispatch error during normal teardown (shutdown set)
+                        // is expected; otherwise the connection is broken — fail
+                        // fast rather than dying silently.
+                        if shutdown.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        error!("fatal: config-writer dispatch failed: {err}");
+                        std::process::exit(1);
                     }
                     // shutdown polling thread on next wakeup rather than parking
                     // on this connection forever.

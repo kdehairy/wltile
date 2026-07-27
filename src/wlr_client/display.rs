@@ -139,8 +139,8 @@ impl DisplayServer {
 
             move || loop {
                 if let Err(err) = queue.blocking_dispatch(&mut state) {
-                    error!("Error dispatching display events: {}", err);
-                    break;
+                    error!("fatal: display dispatch failed: {err}");
+                    std::process::exit(1);
                 }
             }
         });

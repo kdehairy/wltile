@@ -51,13 +51,11 @@ impl ConnectionManager {
 
         thread::spawn(move || {
             loop {
-                // We don't really care about this specific queue.
-                // We are invoking it to force the connection to read events out of the socket.
                 match queue.blocking_dispatch(&mut Data {}) {
-                    Ok(num) => trace!("Dispatched {} events", num),
+                    Ok(num) => trace!("Dispatched {} registry events", num),
                     Err(err) => {
-                        error!("Failed to dispatch events: {}", err);
-                        return;
+                        error!("fatal: registry dispatch failed: {err}");
+                        std::process::exit(1);
                     }
                 }
             }

@@ -134,8 +134,8 @@ impl Client {
         thread::spawn(move || {
             loop {
                 if let Err(err) = queue.blocking_dispatch(&mut wrapper) {
-                    error!("Error dispatching main queue events: {}", err);
-                    break;
+                    error!("fatal: main queue dispatch failed: {err}");
+                    std::process::exit(1);
                 }
             }
         });

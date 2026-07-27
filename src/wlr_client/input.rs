@@ -57,8 +57,8 @@ impl InputServer {
 
             move || loop {
                 if let Err(err) = queue.blocking_dispatch(&mut state) {
-                    error!("Error dispatching input events: {}", err);
-                    break;
+                    error!("fatal: input dispatch failed: {err}");
+                    std::process::exit(1);
                 }
             }
         });
