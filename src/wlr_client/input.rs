@@ -114,17 +114,22 @@ impl Dispatch<WlKeyboard, ()> for StateWrapper {
         _conn: &wayland_client::Connection,
         _qhandle: &QueueHandle<Self>,
     ) {
-        if let wayland_client::protocol::wl_keyboard::Event::Key {
-            serial: _serial,
-            time: _time,
-            key,
-            state: key_state,
-        } = event
-        {
-            trace!("key: {}, {:?}", key, key_state);
-            if let WEnum::Value(KeyState::Pressed) = key_state {
-                let _ = state.state.read().unwrap().key_pressed_tx.send(key);
+        match event {
+            wayland_client::protocol::wl_keyboard::Event::Key {
+                key,
+                state: key_state,
+                ..
+            } => {
+                trace!("key: {}, {:?}", key, key_state);
+                if let WEnum::Value(KeyState::Pressed) = key_state {
+                    let _ = state.state.read().unwrap().key_pressed_tx.send(key);
+                }
             }
+            wayland_client::protocol::wl_keyboard::Event::Leave { .. } => {
+                trace!("keyboard focus left; dismissing");
+                let _ = state.state.read().unwrap().key_pressed_tx.send(0);
+            }
+            _ => {}
         }
     }
 }
