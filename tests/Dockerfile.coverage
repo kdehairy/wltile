@@ -1,0 +1,36 @@
+FROM archlinux:latest
+
+RUN pacman -Syu --noconfirm \
+    && pacman -S --noconfirm \
+        base-devel \
+        curl \
+        libcap \
+        llvm \
+        rust \
+        sway \
+        swaybg \
+    && pacman -Scc --noconfirm
+
+# cargo-llvm-cov driver (prebuilt). It shells out to the llvm tools below.
+RUN curl -fsSL https://github.com/taiki-e/cargo-llvm-cov/releases/latest/download/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz \
+    | tar xzf - -C /usr/local/bin
+
+# Point cargo-llvm-cov at the system llvm tools (matched to the `rust` package).
+ENV LLVM_COV=/usr/bin/llvm-cov
+ENV LLVM_PROFDATA=/usr/bin/llvm-profdata
+
+# sway refuses to run as root; use a dedicated user (see tests/Dockerfile).
+RUN useradd -m -u 1000 testuser
+ENV XDG_RUNTIME_DIR=/run/user/1000
+RUN mkdir -p /run/user/1000 \
+    && chown testuser:testuser /run/user/1000 \
+    && chmod 700 /run/user/1000
+
+WORKDIR /home/testuser/app
+COPY --chown=testuser:testuser . .
+RUN chown testuser:testuser /home/testuser/app
+
+USER testuser
+RUN cargo fetch
+
+CMD ["bash", "tests/coverage.sh"]

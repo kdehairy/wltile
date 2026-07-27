@@ -1,4 +1,4 @@
-.PHONY: build release run clean test unit-test integration-test verify
+.PHONY: build release run clean test unit-test integration-test coverage verify
 
 INTEGRATION_TEST_THREADS ?=
 
@@ -43,6 +43,19 @@ integration-test:
 		$(if $(INTEGRATION_TEST_MEMORY),--memory=$(INTEGRATION_TEST_MEMORY),) \
 		$(if $(INTEGRATION_TEST_THREADS),-e RUST_TEST_THREADS=$(INTEGRATION_TEST_THREADS),) \
 		wltile-integration
+
+coverage:
+	@docker build -t wltile-coverage -f tests/Dockerfile.coverage .
+	# The container writes the report as its `testuser` (uid 1000); make the
+	# mounted dir writable regardless of the host uid (e.g. CI runners differ).
+	@mkdir -p target/coverage && chmod 0777 target/coverage
+	# Full CPU (no throttle) so the instrumented integration suite runs
+	# reliably; shm/SYS_NICE are still needed for the headless sways.
+	@docker run --rm --shm-size=1g --cap-add=SYS_NICE \
+		$(if $(INTEGRATION_TEST_THREADS),-e RUST_TEST_THREADS=$(INTEGRATION_TEST_THREADS),) \
+		-v $(CURDIR)/target/coverage:/output \
+		wltile-coverage
+	@echo "Coverage report: target/coverage/html/index.html"
 
 clean:
 	@cargo clean
