@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender};
 use tracing::{debug, error, info, trace, warn};
@@ -157,7 +157,7 @@ impl ConfigWriter {
                         error!("Error dispatching config-writer events: {}", err);
                         break;
                     }
-                    // shutdown polling thread on next wakeup rather than parking 
+                    // shutdown polling thread on next wakeup rather than parking
                     // on this connection forever.
                     if shutdown.load(Ordering::Relaxed) {
                         break;
@@ -181,10 +181,78 @@ impl ConfigWriter {
         output_manager: &ZwlrOutputManagerV1,
         configs_lock: &ConfigurationsReadLock,
     ) -> Result<(), ClientError> {
+        // We will retry if we get a cancelled response from the compositor, and handle the case of
+        // a stale serial.
+        const MAX_ATTEMPTS: u32 = 3;
+
         debug!("received update request: {request}");
-        let output_configuration =
-            output_manager.create_configuration(request.serial, &self.queue_handle, ());
-        trace!("output_configuration successfully created");
+        for attempt in 1..=MAX_ATTEMPTS {
+            let serial = configs_lock.read().serial();
+            let output_configuration =
+                output_manager.create_configuration(serial, &self.queue_handle, ());
+            trace!("output_configuration created with serial {serial}");
+
+            if !self.configure_heads(&output_configuration, request, configs_lock)? {
+                output_configuration.destroy();
+                return Ok(());
+            }
+
+            info!(
+                "Applying new configurations (attempt {attempt}/{MAX_ATTEMPTS}, serial {serial})"
+            );
+            output_configuration.apply();
+            // Flush ourselves: the dispatch thread is parked in `poll` and won't
+            // flush this apply until it wakes — which only happens once the
+            // compositor replies to the very request we still need to send, or luckly sends some
+            // events on the socket.
+            self.connection.flush()?;
+            match self.status_receiver.recv_timeout(Duration::from_secs(5)) {
+                Ok(Status::Succeeded) => {
+                    info!("applied configurations successfully");
+                    return Ok(());
+                }
+                Ok(Status::Cancelled) => {
+                    warn!(
+                        "apply cancelled (stale serial {serial}); refreshing serial and retrying"
+                    );
+                    // Wait for the main-queue thread to dispatch the newer `done`
+                    // the compositor emitted when it cancelled us, so the next
+                    // attempt uses a fresh serial instead of cancelled again.
+                    Self::wait_for_serial_change(configs_lock, serial);
+                }
+                Ok(Status::Failed) => {
+                    error!("compositor rejected the configuration");
+                    return Err(ClientError::general(String::from(
+                        "failed to update configurations",
+                    )));
+                }
+                Err(_) => {
+                    // No reply within the window — usually a transient stall
+                    // under load. Rebuild and retry; `configure_heads` re-reads
+                    // the current state, so if the apply actually landed the
+                    // retry is a no-op success rather than a double-apply.
+                    warn!(
+                        "timed out waiting for the compositor (attempt {attempt}/{MAX_ATTEMPTS}); retrying"
+                    );
+                }
+            }
+        }
+
+        error!("failed to apply configurations after {MAX_ATTEMPTS} attempts");
+        Err(ClientError::general(String::from(
+            "failed to update configurations",
+        )))
+    }
+
+    /// Gets the current head configs and reconcile it with the request.
+    ///
+    /// returns true if a change is to be applied.
+    fn configure_heads(
+        &self,
+        configuration: &ZwlrOutputConfigurationV1,
+        request: &UpdateRequest,
+        configs_lock: &ConfigurationsReadLock,
+    ) -> Result<bool, ClientError> {
         let mut appy_please = false;
         for head_request in &request.head_requests {
             let configs = configs_lock.read();
@@ -196,36 +264,33 @@ impl ConfigWriter {
             if head_request.enabled == Some(false) {
                 if head.enabled() {
                     debug!("disabling head '{}'", head.name());
-                    output_configuration.disable_head(wlr_head);
+                    configuration.disable_head(wlr_head);
                     appy_please = true;
                 }
                 continue;
             }
 
-            let head_configuration =
-                output_configuration.enable_head(wlr_head, &self.queue_handle, ());
+            let head_configuration = configuration.enable_head(wlr_head, &self.queue_handle, ());
             if Self::reconcile_head_configs(&head_configuration, configs_lock, head, head_request) {
                 appy_please = true;
             }
         }
-        if appy_please {
-            info!("Applying new configurations");
-            output_configuration.apply();
-            // Flush ourselves: the dispatch thread is parked in `poll` and won't
-            // flush this apply until it wakes — which only happens when compositor 
-            // happens to send us some events.
-            self.connection.flush()?;
-            if let Ok(Status::Succeeded) = self.status_receiver.recv_timeout(Duration::from_secs(5))
-            {
-                info!("applied configurations successfully");
-                return Ok(());
+        Ok(appy_please)
+    }
+
+    /// Waits (bounded) for the cached serial to advance past current stale value.
+    ///
+    /// The main-queue will be receiving a 'done' event with the new serial.
+    fn wait_for_serial_change(configs_lock: &ConfigurationsReadLock, stale: u32) {
+        let deadline = Instant::now()
+            .checked_add(Duration::from_secs(1))
+            .expect("deadline overflowed the clock");
+        while Instant::now() < deadline {
+            if configs_lock.read().serial() != stale {
+                return;
             }
-            error!("failed to apply configurations");
-            return Err(ClientError::general(String::from(
-                "failed to update configurations",
-            )));
+            thread::sleep(Duration::from_millis(20));
         }
-        Ok(())
     }
 
     fn reconcile_head_configs(
