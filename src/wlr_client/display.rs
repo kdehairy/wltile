@@ -36,8 +36,6 @@ use crate::wlr_client::{ConfigurationsReadLock, ConnectionManager};
 
 #[derive(Debug, PartialEq)]
 enum State {
-    /// Nothing to draw.
-    Wait,
     /// frame buffer is all set and ready to go.
     Ready,
     /// frame buffer committed to the compositor.
@@ -140,17 +138,9 @@ impl DisplayServer {
             };
 
             move || loop {
-                // no need to pull more than the 60 Hz refresh rate.
-                // specially that what we draw is static in nature
-                thread::sleep(Duration::from_millis(16));
-
-                // flushing all out going requests, if any
-                if let Err(err) = queue.flush() {
-                    error!("Failed to flush out going events: {}", err);
-                }
-
-                if let Err(err) = queue.dispatch_pending(&mut state) {
-                    error!("Error dispatching events: {}", err);
+                if let Err(err) = queue.blocking_dispatch(&mut state) {
+                    error!("fatal: display dispatch failed: {err}");
+                    std::process::exit(1);
                 }
             }
         });
@@ -234,12 +224,13 @@ impl DisplayServer {
                         });
                     }
                 };
-                if let Some(o) = self.state.read().unwrap().wl_output_from_output_head(oh) {
-                    wl_output = Some(o);
-                }
             }
+
+            // Offset into the shared pool where this surface's buffer will lives.
+            let buffer_offset = self.sh_mem_offset;
+
             let wl_buff = self.wl_pool.create_buffer(
-                i32::try_from(self.sh_mem_offset).unwrap(),
+                i32::try_from(buffer_offset).unwrap(),
                 i32::try_from(width).unwrap(),
                 i32::try_from(height).unwrap(),
                 i32::try_from(width.saturating_mul(PIXEL_SIZE)).unwrap(),
@@ -253,9 +244,6 @@ impl DisplayServer {
                 .xdg_wm_base
                 .get_xdg_surface(&wl_surface, &self.queue_handle, ());
             let xdg_toplevel = xdg_surface.get_toplevel(&self.queue_handle, ());
-            // We need to do a commit after asiging a role, then we will get the configure event.
-            wl_surface.commit();
-            xdg_toplevel.set_fullscreen(wl_output.as_ref());
 
             unsafe {
                 std::ptr::copy(
@@ -264,26 +252,45 @@ impl DisplayServer {
                     // in the shmem.
                     // It's Ok from the whole crate perspective, since we are always going through
                     // the outputs once, and we allocate enough buffer for them all (and a bit more).
-                    self.sh_mem.addr.offset(self.sh_mem_offset),
+                    self.sh_mem.addr.offset(buffer_offset),
                     buff.len(),
                 );
             }
 
-            self.sh_mem_offset = self
-                .sh_mem_offset
-                .saturating_add(isize::try_from(buff.len()).unwrap());
-            let mut surface = Surface {
+            self.sh_mem_offset =
+                buffer_offset.saturating_add(isize::try_from(buff.len()).unwrap());
+
+            let commit_surface = wl_surface.clone();
+            let fullscreen_toplevel = xdg_toplevel.clone();
+
+            let surface = Surface {
                 wl_surface,
                 wl_buff,
-                sh_mem_offset: self.sh_mem_offset,
+                sh_mem_offset: buffer_offset,
                 xdg_surface,
                 xdg_toplevel,
-                state: State::Wait,
-                output: wl_output,
+                state: State::Ready,
+                output: wl_output.clone(),
                 transform: None,
             };
-            surface.state = State::Ready;
+
+            // Register the surface BEFORE the role-assigning commit that makes
+            // the compositor emit `xdg_surface::configure`. If we committed
+            // first, the display thread could dispatch that configure before the
+            // surface is tracked here — the handler would find nothing, the
+            // buffer would never be attached, and the surface would stall in
+            // `Ready` forever (blank output + `wait_until_presented` timeout).
             self.state.write().unwrap().surfaces.push(surface);
+
+            // Now assign the top_level role and request the configure.
+            commit_surface.commit();
+            fullscreen_toplevel.set_fullscreen(wl_output.as_ref());
+
+            // Flush these requests ourselves. The display thread now blocks in
+            // `blocking_dispatch` and won't flush again until it wakes — but it
+            // can't wake until the configure that this commit triggers arrives.
+            // Without this flush the two would deadlock.
+            self.connection.flush()?;
         }
 
         Ok(())

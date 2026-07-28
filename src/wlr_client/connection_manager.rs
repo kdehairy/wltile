@@ -1,12 +1,9 @@
 use std::{
     ops::RangeInclusive,
     os::fd::OwnedFd,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Condvar, Mutex},
     thread::{self},
-    time::{self, Duration},
+    time::Duration,
 };
 
 use tracing::{error, trace};
@@ -54,13 +51,11 @@ impl ConnectionManager {
 
         thread::spawn(move || {
             loop {
-                // We don't really care about this specific queue.
-                // We are invoking it to force the connection to read events out of the socket.
                 match queue.blocking_dispatch(&mut Data {}) {
-                    Ok(num) => trace!("Dispatched {} events", num),
+                    Ok(num) => trace!("Dispatched {} registry events", num),
                     Err(err) => {
-                        error!("Failed to dispatch events: {}", err);
-                        return;
+                        error!("fatal: registry dispatch failed: {err}");
+                        std::process::exit(1);
                     }
                 }
             }
@@ -96,24 +91,16 @@ impl ConnectionManager {
             })?;
         conn.flush()?;
 
-        let end = time::Instant::now()
-            .checked_add(Duration::from_secs(3))
-            .expect("Should not happen");
-        loop {
-            if end <= time::Instant::now() {
-                error!("Timeout while syncing");
-                return Err(ClientError::Dispatch {
-                    msg: String::from("Failed to sync with wayland server."),
-                });
-            }
-            // see if the successful read included our callback
-            if state.done.load(Ordering::Relaxed) {
-                break;
-            }
-            // Normally this hungry tight loop is harmfull. But under integration tests 
-            // with parallel execution and limited CPU on public CI/CD runners, it eats
-            // up CPU scheduling. Hence, yeilding the CPU for a bit.
-            thread::sleep(Duration::from_millis(1));
+        let done = state.done.lock().expect("sync mutex poisoned");
+        let (_done, wait) = state
+            .condvar
+            .wait_timeout_while(done, Duration::from_secs(3), |done| !*done)
+            .expect("sync mutex poisoned");
+        if wait.timed_out() {
+            error!("Timeout while syncing");
+            return Err(ClientError::Dispatch {
+                msg: String::from("Failed to sync with wayland server."),
+            });
         }
         trace!("Syncing finished");
 
@@ -124,7 +111,7 @@ impl ConnectionManager {
         self.connection.new_event_queue()
     }
 
-    /// Same as `bind_global` but instead of returning the first object of the requested
+    /// Same as [`ConnectionManager::bind_global`] but instead of returning the first object of the requested
     /// interface it finds, it will return all objects.
     /// This is to return global objects for interfaces that has multiple like `wl_output`.
     pub(super) fn bind_all_globals<Iface, State, UData>(
@@ -225,9 +212,18 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for Data {
     }
 }
 
-#[derive(Default)]
 struct SyncData {
-    done: AtomicBool,
+    done: Mutex<bool>,
+    condvar: Condvar,
+}
+
+impl Default for SyncData {
+    fn default() -> Self {
+        Self {
+            done: Mutex::new(false),
+            condvar: Condvar::new(),
+        }
+    }
 }
 
 impl ObjectData for SyncData {
@@ -236,7 +232,8 @@ impl ObjectData for SyncData {
         _handle: &Backend,
         _msg: protocol::Message<ObjectId, OwnedFd>,
     ) -> Option<Arc<dyn ObjectData>> {
-        self.done.store(true, Ordering::Relaxed);
+        *self.done.lock().expect("sync mutex poisoned") = true;
+        self.condvar.notify_all();
         None
     }
 

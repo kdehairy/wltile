@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use tracing::{debug, error};
 use wayland_client::Proxy;
 use wayland_client::{Dispatch, event_created_child};
@@ -26,14 +24,20 @@ impl Dispatch<ZwlrOutputManagerV1, ()> for StateWrapper {
             }
             Done { serial } => {
                 debug!("serial: {}", serial);
-                let mut configurations = wrapper.state.write().unwrap();
-                configurations.set_serial(serial);
-                if configurations.is_dirty()
-                    && let Err(err) = wrapper.update_tx.send_timeout((), Duration::from_secs(1))
-                {
-                    error!("Failed to send config update after attaching a head: {err}");
-                } else {
-                    configurations.set_dirty(false);
+                let dirty = {
+                    let mut configurations = wrapper.state.write().unwrap();
+                    configurations.set_serial(serial);
+                    configurations.is_dirty()
+                };
+                if dirty {
+                    match wrapper.update_tx.send(()) {
+                        Ok(()) => wrapper.state.write().unwrap().set_dirty(false),
+                        Err(err) => {
+                            // Leave `dirty` set so the next `Done` retries the
+                            // notification.
+                            error!("Failed to send config update after attaching a head: {err}");
+                        }
+                    }
                 }
             }
             _ => {}

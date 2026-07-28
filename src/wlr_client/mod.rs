@@ -7,7 +7,7 @@ pub mod shmem;
 pub(crate) mod input;
 pub(crate) mod output;
 
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use std::sync::{Arc, Condvar, Mutex, RwLock, RwLockReadGuard};
 use std::thread;
 use std::time::Duration;
 
@@ -19,7 +19,8 @@ use output::config_writer::{ConfigWriter, UpdateRequest};
 use output::configs::Configurations;
 use tracing::{debug, error, trace};
 
-use wayland_client::EventQueue;
+use wayland_client::protocol::wl_callback::{self, WlCallback};
+use wayland_client::{Connection, Dispatch, EventQueue, QueueHandle};
 use wayland_protocols_wlr::output_management::v1::client::zwlr_output_manager_v1::ZwlrOutputManagerV1;
 
 use crate::wlr_client::connection_manager::ConnectionManager;
@@ -32,19 +33,54 @@ struct StateWrapper {
     update_tx: Sender<()>,
 }
 
-/// Owns the main event queue used to keep the shared `Configurations` cache
-/// up to date. Shared (via `Arc<Mutex<_>>`) between the periodic background
-/// dispatcher and any caller that needs an on-demand refresh — see
-/// [`Client::refresh_configurations`].
-struct MainDispatcher {
-    queue: EventQueue<StateWrapper>,
-    wrapper: StateWrapper,
+/// One-shot cross-thread barrier used by [`Client::refresh_configurations`] to
+/// block until the main queue thread has dispatched a `wl_display.sync`
+/// callback; every compositor event emitted before it is now reflected in
+/// the shared `Configurations` cache.
+#[derive(Clone)]
+struct Barrier {
+    inner: Arc<(Mutex<bool>, Condvar)>,
 }
 
-impl MainDispatcher {
-    fn dispatch(&mut self) -> Result<usize, ClientError> {
-        self.queue.flush()?;
-        Ok(self.queue.dispatch_pending(&mut self.wrapper)?)
+impl Default for Barrier {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new((Mutex::new(false), Condvar::new())),
+        }
+    }
+}
+
+impl Barrier {
+    fn signal(&self) {
+        let (lock, cvar) = &*self.inner;
+        *lock.lock().expect("barrier mutex poisoned") = true;
+        cvar.notify_all();
+    }
+
+    /// Waits up to `timeout` for [`signal`](Self::signal). Returns `true` if
+    /// signalled, `false` on timeout.
+    fn wait(&self, timeout: Duration) -> bool {
+        let (lock, cvar) = &*self.inner;
+        let guard = lock.lock().expect("barrier mutex poisoned");
+        let (_guard, res) = cvar
+            .wait_timeout_while(guard, timeout, |signalled| !*signalled)
+            .expect("barrier mutex poisoned");
+        !res.timed_out()
+    }
+}
+
+impl Dispatch<WlCallback, Barrier> for StateWrapper {
+    fn event(
+        _state: &mut Self,
+        _proxy: &WlCallback,
+        event: <WlCallback as wayland_client::Proxy>::Event,
+        data: &Barrier,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        if let wl_callback::Event::Done { .. } = event {
+            data.signal();
+        }
     }
 }
 
@@ -68,13 +104,13 @@ pub struct Client {
     connection_manager: ConnectionManager,
     input_server: Option<InputServer>,
     update_rx: Receiver<()>,
-    dispatcher: Arc<Mutex<MainDispatcher>>,
+    queue_handle: QueueHandle<StateWrapper>,
 }
 
 impl Client {
     pub fn new() -> Result<Client, ClientError> {
         let mut conn_man = ConnectionManager::connect()?;
-        let queue: EventQueue<StateWrapper> = conn_man.new_queue();
+        let mut queue: EventQueue<StateWrapper> = conn_man.new_queue();
         let queue_handle = queue.handle();
 
         let state = Arc::new(RwLock::new(Configurations::default()));
@@ -83,35 +119,26 @@ impl Client {
         conn_man.sync()?;
 
         let (tx, rx) = crossbeam_channel::unbounded();
-        let dispatcher = Arc::new(Mutex::new(MainDispatcher {
-            queue,
-            wrapper: StateWrapper {
-                state: state.clone(),
-                update_tx: tx.clone(),
-            },
-        }));
-        dispatcher.lock().unwrap().dispatch()?;
+        let mut wrapper = StateWrapper {
+            state: state.clone(),
+            update_tx: tx,
+        };
+
+        // Drain what the initial sync pulled in so the cache is populated before
+        // we hand the queue to its dispatch thread and return to the caller.
+        queue.dispatch_pending(&mut wrapper)?;
         debug!("configurations received");
 
-        thread::spawn({
-            let dispatcher = dispatcher.clone();
-            move || {
-                loop {
-                    thread::sleep(Duration::from_millis(500));
-
-                    match dispatcher.lock().unwrap().dispatch() {
-                        Ok(size) => {
-                            if size > 0 {
-                                trace!("Dispatched {size} pending events");
-                            }
-                        }
-                        Err(err) => error!("Error dispatching events: {}", err),
-                    }
+        // Event-driven main dispatch: block until the compositor sends events,
+        // then dispatch them into the shared `Configurations` cache.
+        thread::spawn(move || {
+            loop {
+                if let Err(err) = queue.blocking_dispatch(&mut wrapper) {
+                    error!("fatal: main queue dispatch failed: {err}");
+                    std::process::exit(1);
                 }
             }
         });
-
-        trace!("started display server");
 
         Ok(Client {
             configurations: state,
@@ -119,7 +146,7 @@ impl Client {
             connection_manager: conn_man,
             input_server: None,
             update_rx: rx,
-            dispatcher,
+            queue_handle,
         })
     }
 
@@ -136,17 +163,24 @@ impl Client {
     /// Blocks until the shared `Configurations` cache reflects everything the
     /// compositor has emitted so far, then returns.
     ///
-    /// The periodic background dispatch only runs every ~500ms, decoupled
-    /// from this client's own `update_configurations` calls (which commit
-    /// through a separate, dedicated event queue). A caller that applies a
-    /// property change and then immediately needs to compute geometry from
-    /// it (e.g. positioning one head relative to another whose scale it just
-    /// changed) would otherwise read stale, pre-change state from the cache.
+    /// A caller that applies a property change and then immediately needs to
+    /// compute geometry from it (e.g. positioning one head relative to another
+    /// whose scale it just changed) would otherwise read stale configurations.
+    ///
+    /// Implemented as a barrier: enqueue a `wl_display.sync` callback on the
+    /// main queue. Because its `Done` is dispatched by the main queue thread
+    /// only after every earlier compositor event, the cache is guaranteed
+    /// current once the barrier fires.
     pub(crate) fn refresh_configurations(&self) -> Result<(), ClientError> {
-        self.connection_manager.sync()?;
-        // sync() does not really apply the new changes to the cache. we need
-        // to dispatch what we got in the queue after the sync.
-        self.dispatcher.lock().unwrap().dispatch()?;
+        let barrier = Barrier::default();
+        let conn = self.connection_manager.connection();
+        conn.display().sync(&self.queue_handle, barrier.clone());
+        conn.flush()?;
+        if !barrier.wait(Duration::from_secs(3)) {
+            return Err(ClientError::Dispatch {
+                msg: String::from("Timed out refreshing configurations"),
+            });
+        }
         Ok(())
     }
 

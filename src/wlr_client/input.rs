@@ -1,7 +1,6 @@
 use std::{
     sync::{Arc, RwLock},
     thread,
-    time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender};
@@ -57,17 +56,9 @@ impl InputServer {
             };
 
             move || loop {
-                // no need to pull more than the 60 Hz refresh rate.
-                // specially that what we draw is static in nature
-                thread::sleep(Duration::from_millis(16));
-
-                // flushing all out going requests, if any
-                if let Err(err) = queue.flush() {
-                    error!("Failed to flush out going events: {}", err);
-                }
-
-                if let Err(err) = queue.dispatch_pending(&mut state) {
-                    error!("Error dispatching events: {}", err);
+                if let Err(err) = queue.blocking_dispatch(&mut state) {
+                    error!("fatal: input dispatch failed: {err}");
+                    std::process::exit(1);
                 }
             }
         });
@@ -124,33 +115,19 @@ impl Dispatch<WlKeyboard, ()> for StateWrapper {
         _qhandle: &QueueHandle<Self>,
     ) {
         match event {
-            wayland_client::protocol::wl_keyboard::Event::Keymap { format, fd, size } => {
-                trace!("keymap: {:?}, {:?}, {}", format, fd, size);
-            }
-            wayland_client::protocol::wl_keyboard::Event::Enter {
-                serial: _serial,
-                surface: _surface,
-                keys: _keys,
-            } => {
-                trace!("Keyboard focus entered");
-            }
-            wayland_client::protocol::wl_keyboard::Event::Leave {
-                serial: _serial,
-                surface: _surface,
-            } => {
-                trace!("Keyboard focus left");
-                let _ = state.state.read().unwrap().key_pressed_tx.send(0);
-            }
             wayland_client::protocol::wl_keyboard::Event::Key {
-                serial: _serial,
-                time: _time,
                 key,
                 state: key_state,
+                ..
             } => {
                 trace!("key: {}, {:?}", key, key_state);
                 if let WEnum::Value(KeyState::Pressed) = key_state {
                     let _ = state.state.read().unwrap().key_pressed_tx.send(key);
                 }
+            }
+            wayland_client::protocol::wl_keyboard::Event::Leave { .. } => {
+                trace!("keyboard focus left; dismissing");
+                let _ = state.state.read().unwrap().key_pressed_tx.send(0);
             }
             _ => {}
         }

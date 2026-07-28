@@ -1,8 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Fail-fast on a broken compositor connection instead of hanging silently.
+
+### Changed
+- Event-driven compositor dispatch (no polling): lower reload latency and idle CPU.
+
 ### Fixed
 - Applying geometry changes on stale cached configs.
+- `set`, `position` and `list` hanging against a slow or starved compositor.
+- Configuration applies spuriously failing under load because of outdated serial.
+- no output-name overlay displayed in `show`.
+- Overlay redraw writing into a neighbouring output's buffer.
 
 ## [v1.3.0]
 ### Fixed

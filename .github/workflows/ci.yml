@@ -46,7 +46,19 @@ jobs:
     needs: verify
     steps:
       - uses: actions/checkout@v4
-      - run: make integration-test INTEGRATION_TEST_THREADS=2
+      - run: make coverage INTEGRATION_TEST_THREADS=2
+      - name: Coverage summary
+        run: |
+          {
+            echo '```'
+            cat target/coverage/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload HTML coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: target/coverage/html
 
   release:
     name: release
