@@ -108,7 +108,7 @@ pub enum Commands {
     },
 }
 
-#[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Property {
     Mode,
     Scale,
@@ -118,7 +118,7 @@ pub enum Property {
 
 // Postfix is functionally needed here
 #[allow(clippy::enum_variant_names)]
-#[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Relation {
     LeftOf,
     RightOf,
@@ -139,7 +139,7 @@ impl Display for Relation {
 
 // Prefix is functionally needed here
 #[allow(clippy::enum_variant_names)]
-#[derive(ValueEnum, Copy, Clone, PartialEq, Eq)]
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Alignment {
     AlignBottom,
     AlignTop,
@@ -180,5 +180,222 @@ pub(crate) fn validate(args: &Cli) -> Result<(), String> {
             _ => Ok(()),
         },
         _ => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Alignment, Cli, Commands, Property, Relation, validate};
+    use clap::{CommandFactory, Parser};
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).expect("args should parse")
+    }
+
+    #[test]
+    fn clap_config_is_valid() {
+        Cli::command().debug_assert();
+    }
+
+    // --- validate(): the relation x alignment compatibility matrix ---
+
+    #[test]
+    fn validate_rejects_horizontal_relation_with_horizontal_alignment() {
+        for relation in ["left-of", "right-of"] {
+            for alignment in ["align-left", "align-right"] {
+                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
+                assert!(
+                    validate(&cli).is_err(),
+                    "{relation} + {alignment} should be rejected"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn validate_rejects_vertical_relation_with_vertical_alignment() {
+        for relation in ["top-of", "bottom-of"] {
+            for alignment in ["align-top", "align-bottom"] {
+                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
+                assert!(
+                    validate(&cli).is_err(),
+                    "{relation} + {alignment} should be rejected"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn validate_accepts_horizontal_relation_with_vertical_alignment() {
+        for relation in ["left-of", "right-of"] {
+            for alignment in ["align-top", "align-bottom"] {
+                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
+                assert!(
+                    validate(&cli).is_ok(),
+                    "{relation} + {alignment} should be accepted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn validate_accepts_vertical_relation_with_horizontal_alignment() {
+        for relation in ["top-of", "bottom-of"] {
+            for alignment in ["align-left", "align-right"] {
+                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
+                assert!(
+                    validate(&cli).is_ok(),
+                    "{relation} + {alignment} should be accepted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn validate_ignores_non_position_commands() {
+        assert!(validate(&parse(&["wltile", "list"])).is_ok());
+        assert!(validate(&parse(&["wltile", "show"])).is_ok());
+    }
+
+    // --- parsing round-trips ---
+
+    #[test]
+    fn parses_list() {
+        assert!(matches!(parse(&["wltile", "list"]).command, Commands::List));
+    }
+
+    #[test]
+    fn parses_show_without_output() {
+        assert!(matches!(
+            parse(&["wltile", "show"]).command,
+            Commands::Show { output: None }
+        ));
+    }
+
+    #[test]
+    fn parses_show_with_output() {
+        match parse(&["wltile", "show", "HDMI-1"]).command {
+            Commands::Show { output } => assert_eq!(output.as_deref(), Some("HDMI-1")),
+            _ => panic!("expected the Show command"),
+        }
+    }
+
+    #[test]
+    fn position_defaults_alignment_to_align_bottom() {
+        match parse(&["wltile", "position", "A", "right-of", "B"]).command {
+            Commands::Position { alignment, .. } => {
+                assert_eq!(alignment, Alignment::AlignBottom);
+            }
+            _ => panic!("expected the Position command"),
+        }
+    }
+
+    #[test]
+    fn parses_position_with_all_fields() {
+        match parse(&["wltile", "position", "A", "top-of", "B", "align-left"]).command {
+            Commands::Position {
+                target,
+                relation,
+                reference,
+                alignment,
+            } => {
+                assert_eq!(target, "A");
+                assert_eq!(relation, Relation::TopOf);
+                assert_eq!(reference, "B");
+                assert_eq!(alignment, Alignment::AlignLeft);
+            }
+            _ => panic!("expected the Position command"),
+        }
+    }
+
+    #[test]
+    fn parses_set_with_property_value_enum() {
+        match parse(&["wltile", "set", "HDMI-1", "scale", "2"]).command {
+            Commands::Set {
+                target,
+                property,
+                value,
+            } => {
+                assert_eq!(target, "HDMI-1");
+                assert_eq!(property, Property::Scale);
+                assert_eq!(value, "2");
+            }
+            _ => panic!("expected the Set command"),
+        }
+    }
+
+    #[test]
+    fn parses_daemon_with_all_flags() {
+        match parse(&[
+            "wltile", "daemon", "--config", "/c.toml", "--log", "/l.log", "--err", "/e.log",
+            "--systemd",
+        ])
+        .command
+        {
+            Commands::Daemon {
+                config,
+                log,
+                err_log,
+                systemd,
+            } => {
+                assert_eq!(config.as_deref(), Some("/c.toml"));
+                assert_eq!(log.as_deref(), Some("/l.log"));
+                assert_eq!(err_log.as_deref(), Some("/e.log"));
+                assert!(systemd);
+            }
+            _ => panic!("expected the Daemon command"),
+        }
+    }
+
+    #[test]
+    fn parses_daemon_with_defaults() {
+        match parse(&["wltile", "daemon"]).command {
+            Commands::Daemon {
+                config,
+                log,
+                err_log,
+                systemd,
+            } => {
+                assert!(config.is_none());
+                assert!(log.is_none());
+                assert!(err_log.is_none());
+                assert!(!systemd);
+            }
+            _ => panic!("expected the Daemon command"),
+        }
+    }
+
+    #[test]
+    fn counts_verbosity_flags() {
+        assert_eq!(parse(&["wltile", "list"]).verbose, 0);
+        assert_eq!(parse(&["wltile", "-vvv", "list"]).verbose, 3);
+    }
+
+    #[test]
+    fn rejects_unknown_property() {
+        assert!(Cli::try_parse_from(["wltile", "set", "A", "bogus", "1"]).is_err());
+    }
+
+    #[test]
+    fn position_requires_arguments() {
+        assert!(Cli::try_parse_from(["wltile", "position"]).is_err());
+    }
+
+    // --- Display impls ---
+
+    #[test]
+    fn relation_display_renders_kebab_case() {
+        assert_eq!(Relation::LeftOf.to_string(), "left-of");
+        assert_eq!(Relation::RightOf.to_string(), "right-of");
+        assert_eq!(Relation::TopOf.to_string(), "top-of");
+        assert_eq!(Relation::BottomOf.to_string(), "bottom-of");
+    }
+
+    #[test]
+    fn alignment_display_renders_kebab_case() {
+        assert_eq!(Alignment::AlignBottom.to_string(), "align-bottom");
+        assert_eq!(Alignment::AlignTop.to_string(), "align-top");
+        assert_eq!(Alignment::AlignRight.to_string(), "align-right");
+        assert_eq!(Alignment::AlignLeft.to_string(), "align-left");
     }
 }
