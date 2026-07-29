@@ -175,7 +175,7 @@ pub(crate) fn validate(args: &Cli) -> Result<(), String> {
                 "Impossible to align bottom on a vertical setup",
             )),
             (Relation::TopOf | Relation::BottomOf, Alignment::AlignTop) => Err(String::from(
-                "Impossible to align top on a horizontal setup",
+                "Impossible to align top on a vertical setup",
             )),
             _ => Ok(()),
         },
