@@ -14,6 +14,9 @@ const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const APPEAR_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 const SWAYMSG_TIMEOUT: Duration = Duration::from_secs(15);
+/// How long to wait for a daemon to exit after SIGTERM at teardown before
+/// falling back to SIGKILL.
+const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 /// A healthy `wltile` one-shot completes well under a second; wltile bounds its
 /// own compositor waits internally (a few seconds each). This ceiling only
 /// catches a genuine hang (e.g. a Wayland read-coordination stall under CI CPU
@@ -351,7 +354,14 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        self.child.kill().ok();
+        // Shut down with SIGTERM (graceful) rather than SIGKILL: a normal exit
+        // flushes the daemon's coverage profile, whereas SIGKILL is uncatchable
+        // and discards it. Fall back to SIGKILL if it doesn't stop in time so
+        // teardown can never hang.
+        self.terminate();
+        if self.wait_for_exit(SHUTDOWN_TIMEOUT).is_none() {
+            self.child.kill().ok();
+        }
         self.child.wait().ok();
     }
 }
