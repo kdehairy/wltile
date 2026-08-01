@@ -102,17 +102,13 @@ impl Compositor {
             );
         }
 
-        let deadline = Instant::now() + APPEAR_TIMEOUT;
-        loop {
-            if self.outputs().iter().any(|o| o.name == expected) {
-                break;
-            }
-            assert!(
-                Instant::now() < deadline,
-                "output {expected} did not appear within {APPEAR_TIMEOUT:?}",
-            );
-            thread::sleep(POLL_INTERVAL);
-        }
+        poll_until(APPEAR_TIMEOUT, || {
+            self.outputs()
+                .iter()
+                .any(|o| o.name == expected)
+                .then_some(())
+        })
+        .unwrap_or_else(|| panic!("output {expected} did not appear within {APPEAR_TIMEOUT:?}"));
 
         expected
     }
@@ -128,26 +124,11 @@ impl Compositor {
     ///
     /// Bounded by `WLTILE_TIMEOUT`
     pub fn run_wltile_with_env(&self, args: &[&str], extra_env: &[(&str, &str)]) -> Output {
-        let bin = env!("CARGO_BIN_EXE_wltile");
-        let wayland_display = self
-            .wayland_sock
-            .file_name()
-            .expect("failed to get wayland display")
-            .to_owned();
-        let runtime_dir = self.runtime_dir.clone();
-        let owned_env: Vec<(String, String)> = extra_env
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-            .collect();
-        let owned_args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+        let mut cmd = self.wltile_command();
+        cmd.envs(extra_env.iter().copied()).args(args);
 
-        run_bounded(WLTILE_TIMEOUT, format!("wltile {owned_args:?}"), move || {
-            Command::new(bin)
-                .env("WAYLAND_DISPLAY", &wayland_display)
-                .env("XDG_RUNTIME_DIR", &runtime_dir)
-                .envs(owned_env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
-                .args(&owned_args)
-                .output()
+        run_bounded(WLTILE_TIMEOUT, format!("wltile {args:?}"), move || {
+            cmd.output()
         })
     }
 
@@ -155,15 +136,22 @@ impl Compositor {
     /// which blocks for user input and so can't go through the bounded
     /// [`run_wltile`](Self::run_wltile).
     pub fn spawn_wltile(&self, args: &[&str]) -> WltileChild {
-        let child = Command::new(env!("CARGO_BIN_EXE_wltile"))
-            .env("WAYLAND_DISPLAY", self.wayland_display_name())
-            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+        let child = self
+            .wltile_command()
             .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .expect("failed to spawn wltile");
         WltileChild { child }
+    }
+
+    /// A `Command` for the `wltile` binary, pointed at this compositor instance.
+    fn wltile_command(&self) -> Command {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_wltile"));
+        cmd.env("WAYLAND_DISPLAY", self.wayland_display_name())
+            .env("XDG_RUNTIME_DIR", &self.runtime_dir);
+        cmd
     }
 
     /// Injects a single key press (types `x`) into whichever surface currently
@@ -212,14 +200,8 @@ impl Compositor {
     pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
         let log =
             File::create(self.runtime_dir.join("daemon.log")).expect("failed to create daemon log");
-        let child = Command::new(env!("CARGO_BIN_EXE_wltile"))
-            .env(
-                "WAYLAND_DISPLAY",
-                self.wayland_sock
-                    .file_name()
-                    .expect("failed to get wayland display"),
-            )
-            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+        let child = self
+            .wltile_command()
             .args([
                 "-vvv",
                 "daemon",
@@ -245,16 +227,7 @@ impl Compositor {
         timeout: Duration,
         predicate: impl Fn(&[swaymsg::Output]) -> bool,
     ) -> bool {
-        let deadline = Instant::now() + timeout;
-        loop {
-            if predicate(&self.outputs()) {
-                return true;
-            }
-            if Instant::now() >= deadline {
-                return false;
-            }
-            thread::sleep(POLL_INTERVAL);
-        }
+        poll_until(timeout, || predicate(&self.outputs()).then_some(())).is_some()
     }
 
     /// Repeatedly sends SIGHUP to `daemon` and polls `outputs()` until `predicate`
@@ -273,17 +246,14 @@ impl Compositor {
         timeout: Duration,
         predicate: impl Fn(&[swaymsg::Output]) -> bool,
     ) -> bool {
-        let deadline = Instant::now() + timeout;
-        loop {
+        poll_until(timeout, || {
             if predicate(&self.outputs()) {
-                return true;
-            }
-            if Instant::now() >= deadline {
-                return false;
+                return Some(());
             }
             daemon.reload();
-            thread::sleep(POLL_INTERVAL);
-        }
+            None
+        })
+        .is_some()
     }
 
     /// Disables a connected output via sway's IPC.
@@ -298,22 +268,34 @@ impl Compositor {
 
     /// Runs `swaymsg`, bounded by `SWAYMSG_TIMEOUT`.
     fn swaymsg(&self, args: &[&str]) -> Output {
-        let sway_sock = self.sway_sock.clone();
-        let runtime_dir = self.runtime_dir.clone();
-        let owned_args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+        let mut cmd = Command::new("swaymsg");
+        cmd.arg("-s")
+            .arg(&self.sway_sock)
+            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+            .args(args);
 
         run_bounded(
             SWAYMSG_TIMEOUT,
-            format!("swaymsg {owned_args:?} (sway IPC likely starved)"),
-            move || {
-                Command::new("swaymsg")
-                    .arg("-s")
-                    .arg(&sway_sock)
-                    .env("XDG_RUNTIME_DIR", &runtime_dir)
-                    .args(&owned_args)
-                    .output()
-            },
+            format!("swaymsg {args:?} (sway IPC likely starved)"),
+            move || cmd.output(),
         )
+    }
+}
+
+/// Polls `f` every `POLL_INTERVAL` until it yields a value, or `timeout` elapses.
+///
+/// `f` is always evaluated at least once, and once more after the final sleep,
+/// so a condition that becomes true exactly at the deadline is still observed.
+fn poll_until<T>(timeout: Duration, mut f: impl FnMut() -> Option<T>) -> Option<T> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(value) = f() {
+            return Some(value);
+        }
+        if Instant::now() >= deadline {
+            return None;
+        }
+        thread::sleep(POLL_INTERVAL);
     }
 }
 
@@ -353,16 +335,7 @@ impl WltileChild {
     /// Polls for exit until `timeout` elapses. A clean exit (returned here)
     /// flushes the process's coverage profile; `None` means it's still running.
     pub fn wait_for_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
-        let deadline = Instant::now() + timeout;
-        loop {
-            if let Ok(Some(status)) = self.child.try_wait() {
-                return Some(status);
-            }
-            if Instant::now() >= deadline {
-                return None;
-            }
-            thread::sleep(POLL_INTERVAL);
-        }
+        poll_until(timeout, || self.child.try_wait().ok().flatten())
     }
 }
 
@@ -392,16 +365,7 @@ impl Daemon {
 
     /// Polls for process exit until `timeout` elapses.
     pub fn wait_for_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
-        let deadline = Instant::now() + timeout;
-        loop {
-            if let Ok(Some(status)) = self.child.try_wait() {
-                return Some(status);
-            }
-            if Instant::now() >= deadline {
-                return None;
-            }
-            thread::sleep(POLL_INTERVAL);
-        }
+        poll_until(timeout, || self.child.try_wait().ok().flatten())
     }
 
     /// Whether the process is still running.
@@ -438,9 +402,8 @@ fn read_log(path: &Path) -> String {
 
 /// Polls `swaymsg -t get_version` until sway's IPC loop is ready to accept connections.
 fn wait_for_sway_ready(sway_sock: &Path, runtime_dir: &Path, log: &Path, timeout: Duration) {
-    let deadline = Instant::now() + timeout;
-    loop {
-        let ok = Command::new("swaymsg")
+    poll_until(timeout, || {
+        Command::new("swaymsg")
             .arg("-s")
             .arg(sway_sock)
             .env("XDG_RUNTIME_DIR", runtime_dir)
@@ -448,64 +411,53 @@ fn wait_for_sway_ready(sway_sock: &Path, runtime_dir: &Path, log: &Path, timeout
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-
-        if ok {
-            return;
-        }
-
-        assert!(
-            Instant::now() < deadline,
+            .is_ok_and(|s| s.success())
+            .then_some(())
+    })
+    .unwrap_or_else(|| {
+        panic!(
             "sway IPC never became ready\n--- sway log ---\n{}",
             read_log(log),
-        );
-        thread::sleep(POLL_INTERVAL);
-    }
+        )
+    });
 }
 
 /// Scans `runtime_dir` for `sway-ipc.*.<sway_pid>.sock`, blocking until found.
 fn find_sway_sock(runtime_dir: &Path, sway_pid: u32, log: &Path) -> PathBuf {
     let suffix = format!(".{sway_pid}.sock");
-    let deadline = Instant::now() + STARTUP_TIMEOUT;
-    loop {
-        if let Ok(entries) = fs::read_dir(runtime_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                if name.starts_with("sway-ipc.") && name.ends_with(&suffix) {
-                    return entry.path();
-                }
-            }
-        }
-        assert!(
-            Instant::now() < deadline,
+    poll_until(STARTUP_TIMEOUT, || {
+        find_entry(runtime_dir, |name| {
+            name.starts_with("sway-ipc.") && name.ends_with(&suffix)
+        })
+    })
+    .unwrap_or_else(|| {
+        panic!(
             "timed out waiting for sway IPC socket (pid {sway_pid}) in {runtime_dir:?}\n--- sway log ---\n{}",
             read_log(log),
-        );
-        thread::sleep(POLL_INTERVAL);
-    }
+        )
+    })
 }
 
 /// Dynamically finds the Wayland socket created by sway, scanning for any socket in the runtime directory.
 /// Sway creates a wayland socket with a numbered suffix (wayland-0, wayland-1, etc.).
 fn find_wayland_sock(runtime_dir: &Path, log: &Path, timeout: Duration) -> PathBuf {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if let Ok(entries) = fs::read_dir(runtime_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                if name.starts_with("wayland-") && !name.ends_with(".lock") {
-                    return entry.path();
-                }
-            }
-        }
-        assert!(
-            Instant::now() < deadline,
+    poll_until(timeout, || {
+        find_entry(runtime_dir, |name| {
+            name.starts_with("wayland-") && !name.ends_with(".lock")
+        })
+    })
+    .unwrap_or_else(|| {
+        panic!(
             "timed out waiting for Wayland socket in {runtime_dir:?}\n--- sway log ---\n{}",
             read_log(log),
-        );
-        thread::sleep(POLL_INTERVAL);
-    }
+        )
+    })
+}
+
+/// Returns the path of the first entry in `dir` whose file name satisfies `matches`.
+fn find_entry(dir: &Path, matches: impl Fn(&str) -> bool) -> Option<PathBuf> {
+    fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .find_map(|entry| matches(&entry.file_name().to_string_lossy()).then(|| entry.path()))
 }
