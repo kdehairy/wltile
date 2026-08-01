@@ -1,4 +1,36 @@
+use std::time::{Duration, Instant};
+
 use crate::harness::Compositor;
+
+/// The no-arg `show` draws each output's name on-screen and blocks for input.
+/// Drive that path end to end: spawn it, inject key presses until it dismisses,
+/// and assert it exits cleanly.
+#[test]
+fn show_presents_outputs_and_dismisses_on_key_press() {
+    let mut comp = Compositor::new();
+    let _h1 = comp.add_output();
+
+    let mut show = comp.spawn_wltile(&["show"]);
+
+    // Retry: the key must arrive after the overlay is presented AND wltile has
+    // bound the keyboard, so inject repeatedly until `show` dismisses.
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let status = loop {
+        comp.press_key();
+        if let Some(status) = show.wait_for_exit(Duration::from_millis(300)) {
+            break Some(status);
+        }
+        if Instant::now() >= deadline {
+            break None;
+        }
+    };
+
+    let status = status.expect("`wltile show` did not dismiss on key presses within timeout");
+    assert!(
+        status.success(),
+        "`wltile show` should exit cleanly after a key press"
+    );
+}
 
 #[test]
 fn show_output_prints_details() {

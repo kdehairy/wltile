@@ -7,6 +7,7 @@ RUN pacman -Syu --noconfirm \
         rust \
         sway \
 				swaybg \
+        wtype \
     && pacman -Scc --noconfirm
 
 # sway refuses to run as root; create a dedicated test user.
