@@ -1,26 +1,25 @@
+//! A headless sway instance under its own `XDG_RUNTIME_DIR`, plus the operations
+//! tests drive it with: creating outputs, running `wltile` against it, and
+//! observing the resulting compositor state via sway's IPC.
+
 use std::fs::{self, File};
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitStatus, Output, Stdio};
+use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::swaymsg;
 
+use super::daemon::Daemon;
+use super::poll_until;
+use super::process::{WltileChild, run_bounded};
+use super::startup::{find_sway_sock, find_wayland_sock, wait_for_sway_ready};
+
 static INSTANCE_COUNTER: AtomicU32 = AtomicU32::new(0);
 
-const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const APPEAR_TIMEOUT: Duration = Duration::from_secs(5);
-const POLL_INTERVAL: Duration = Duration::from_millis(50);
 const SWAYMSG_TIMEOUT: Duration = Duration::from_secs(15);
-/// How long to wait for a daemon to exit after SIGTERM at teardown before
-/// falling back to SIGKILL.
-const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
-/// A healthy `wltile` one-shot completes well under a second; wltile bounds its
-/// own compositor waits internally (a few seconds each). This ceiling only
-/// catches a genuine hang (e.g. a Wayland read-coordination stall under CI CPU
-/// contention) and turns it into a fast, labelled failure.
 const WLTILE_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct Compositor {
@@ -69,10 +68,9 @@ impl Compositor {
 
         let sway_pid = process.id();
 
-        // Dynamically find the Wayland socket instead of expecting wayland-0
-        let wayland_sock = find_wayland_sock(&runtime_dir, &sway_log, STARTUP_TIMEOUT);
+        let wayland_sock = find_wayland_sock(&runtime_dir, &sway_log);
         let sway_sock = find_sway_sock(&runtime_dir, sway_pid, &sway_log);
-        wait_for_sway_ready(&sway_sock, &runtime_dir, &sway_log, STARTUP_TIMEOUT);
+        wait_for_sway_ready(&sway_sock, &runtime_dir, &sway_log);
 
         Self {
             process,
@@ -114,6 +112,8 @@ impl Compositor {
     }
 
     /// Runs the `wltile` binary against this compositor with the given args.
+    ///
+    /// Bounded by `WLTILE_TIMEOUT`
     pub fn run_wltile(&self, args: &[&str]) -> Output {
         self.run_wltile_with_env(args, &[])
     }
@@ -143,7 +143,31 @@ impl Compositor {
             .stderr(Stdio::piped())
             .spawn()
             .expect("failed to spawn wltile");
-        WltileChild { child }
+        WltileChild::new(child)
+    }
+
+    /// Spawns `wltile daemon --systemd` against this compositor, returning a handle
+    /// used to signal and observe it.
+    pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
+        let log =
+            File::create(self.runtime_dir.join("daemon.log")).expect("failed to create daemon log");
+        let child = self
+            .wltile_command()
+            .args([
+                "-vvv",
+                "daemon",
+                // keeps the process in the foreground instead of forking, so it stays a controllable
+                // child here.
+                "--systemd",
+                "--config",
+                config_path.to_str().expect("config path must be utf-8"),
+            ])
+            .stdout(log.try_clone().expect("failed to clone daemon log"))
+            .stderr(log)
+            .spawn()
+            .expect("failed to spawn wltile daemon");
+
+        Daemon::new(child)
     }
 
     /// A `Command` for the `wltile` binary, pointed at this compositor instance.
@@ -157,8 +181,6 @@ impl Compositor {
     /// Injects a single key press (types `x`) into whichever surface currently
     /// holds keyboard focus, via `wtype` (the Wayland virtual-keyboard protocol).
     pub fn press_key(&self) {
-        // Ignore the exit status (wtype may momentarily have no focus target),
-        // but surface a missing binary loudly rather than silently no-oping.
         Command::new("wtype")
             .env("WAYLAND_DISPLAY", self.wayland_display_name())
             .env("XDG_RUNTIME_DIR", &self.runtime_dir)
@@ -192,32 +214,6 @@ impl Compositor {
         let path = self.runtime_dir.join("config.toml");
         fs::write(&path, contents).expect("failed to write daemon config");
         path
-    }
-
-    /// Spawns `wltile daemon --systemd` against this compositor, returning a handle
-    /// used to signal and observe it. `--systemd` keeps the process in the
-    /// foreground instead of forking, so it stays a controllable child here.
-    pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
-        let log =
-            File::create(self.runtime_dir.join("daemon.log")).expect("failed to create daemon log");
-        let child = self
-            .wltile_command()
-            .args([
-                "-vvv",
-                "daemon",
-                "--systemd",
-                "--config",
-                config_path.to_str().expect("config path must be utf-8"),
-            ])
-            .stdout(log.try_clone().expect("failed to clone daemon log"))
-            .stderr(log)
-            .spawn()
-            .expect("failed to spawn wltile daemon");
-
-        Daemon {
-            pid: child.id(),
-            child,
-        }
     }
 
     /// Polls `outputs()` until `predicate` is satisfied or `timeout` elapses.
@@ -282,182 +278,10 @@ impl Compositor {
     }
 }
 
-/// Polls `f` every `POLL_INTERVAL` until it yields a value, or `timeout` elapses.
-///
-/// `f` is always evaluated at least once, and once more after the final sleep,
-/// so a condition that becomes true exactly at the deadline is still observed.
-fn poll_until<T>(timeout: Duration, mut f: impl FnMut() -> Option<T>) -> Option<T> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if let Some(value) = f() {
-            return Some(value);
-        }
-        if Instant::now() >= deadline {
-            return None;
-        }
-        thread::sleep(POLL_INTERVAL);
-    }
-}
-
-/// Runs a `Command` bounded by `timeout`.
-///
-/// Since `Command::output()` has no built-in timeout, this helper runs it Bounded
-/// instead of waiting forever.
-fn run_bounded<F>(timeout: Duration, label: String, run: F) -> Output
-where
-    F: FnOnce() -> std::io::Result<Output> + Send + 'static,
-{
-    let (tx, rx) = std::sync::mpsc::channel();
-    thread::spawn(move || {
-        // The receiver may already be gone if we timed out; ignore.
-        let _ = tx.send(run());
-    });
-
-    rx.recv_timeout(timeout)
-        .unwrap_or_else(|_| panic!("{label} did not complete within {timeout:?}"))
-        .unwrap_or_else(|err| panic!("{label} failed to run: {err}"))
-}
-
 impl Drop for Compositor {
     fn drop(&mut self) {
         self.process.kill().ok();
         self.process.wait().ok();
         fs::remove_dir_all(&self.runtime_dir).ok();
     }
-}
-
-/// Handle to a `wltile` process spawned via [`Compositor::spawn_wltile`].
-pub struct WltileChild {
-    child: Child,
-}
-
-impl WltileChild {
-    /// Polls for exit until `timeout` elapses. A clean exit (returned here)
-    /// flushes the process's coverage profile; `None` means it's still running.
-    pub fn wait_for_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
-        poll_until(timeout, || self.child.try_wait().ok().flatten())
-    }
-}
-
-impl Drop for WltileChild {
-    fn drop(&mut self) {
-        self.child.kill().ok();
-        self.child.wait().ok();
-    }
-}
-
-/// Handle to a `wltile daemon` process spawned via [`Compositor::spawn_daemon`].
-pub struct Daemon {
-    child: Child,
-    pid: u32,
-}
-
-impl Daemon {
-    /// Sends SIGHUP, asking the daemon to reload and reapply its config file.
-    pub fn reload(&self) {
-        self.signal(libc::SIGHUP);
-    }
-
-    /// Sends SIGTERM, asking the daemon to shut down gracefully.
-    pub fn terminate(&self) {
-        self.signal(libc::SIGTERM);
-    }
-
-    /// Polls for process exit until `timeout` elapses.
-    pub fn wait_for_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
-        poll_until(timeout, || self.child.try_wait().ok().flatten())
-    }
-
-    /// Whether the process is still running.
-    pub fn is_alive(&mut self) -> bool {
-        matches!(self.child.try_wait(), Ok(None))
-    }
-
-    fn signal(&self, sig: libc::c_int) {
-        // SAFETY: `self.pid` is this process's own child; signaling it is safe.
-        let pid: libc::pid_t = self.pid.cast_signed();
-        unsafe {
-            libc::kill(pid, sig);
-        }
-    }
-}
-
-impl Drop for Daemon {
-    fn drop(&mut self) {
-        // Shut down with SIGTERM (graceful) rather than SIGKILL: a normal exit
-        // flushes the daemon's coverage profile, whereas SIGKILL is uncatchable
-        // and discards it. Fall back to SIGKILL if it doesn't stop in time so
-        // teardown can never hang.
-        self.terminate();
-        if self.wait_for_exit(SHUTDOWN_TIMEOUT).is_none() {
-            self.child.kill().ok();
-        }
-        self.child.wait().ok();
-    }
-}
-
-fn read_log(path: &Path) -> String {
-    fs::read_to_string(path).unwrap_or_else(|_| String::from("<log unavailable>"))
-}
-
-/// Polls `swaymsg -t get_version` until sway's IPC loop is ready to accept connections.
-fn wait_for_sway_ready(sway_sock: &Path, runtime_dir: &Path, log: &Path, timeout: Duration) {
-    poll_until(timeout, || {
-        Command::new("swaymsg")
-            .arg("-s")
-            .arg(sway_sock)
-            .env("XDG_RUNTIME_DIR", runtime_dir)
-            .args(["-t", "get_version"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success())
-            .then_some(())
-    })
-    .unwrap_or_else(|| {
-        panic!(
-            "sway IPC never became ready\n--- sway log ---\n{}",
-            read_log(log),
-        )
-    });
-}
-
-/// Scans `runtime_dir` for `sway-ipc.*.<sway_pid>.sock`, blocking until found.
-fn find_sway_sock(runtime_dir: &Path, sway_pid: u32, log: &Path) -> PathBuf {
-    let suffix = format!(".{sway_pid}.sock");
-    poll_until(STARTUP_TIMEOUT, || {
-        find_entry(runtime_dir, |name| {
-            name.starts_with("sway-ipc.") && name.ends_with(&suffix)
-        })
-    })
-    .unwrap_or_else(|| {
-        panic!(
-            "timed out waiting for sway IPC socket (pid {sway_pid}) in {runtime_dir:?}\n--- sway log ---\n{}",
-            read_log(log),
-        )
-    })
-}
-
-/// Dynamically finds the Wayland socket created by sway, scanning for any socket in the runtime directory.
-/// Sway creates a wayland socket with a numbered suffix (wayland-0, wayland-1, etc.).
-fn find_wayland_sock(runtime_dir: &Path, log: &Path, timeout: Duration) -> PathBuf {
-    poll_until(timeout, || {
-        find_entry(runtime_dir, |name| {
-            name.starts_with("wayland-") && !name.ends_with(".lock")
-        })
-    })
-    .unwrap_or_else(|| {
-        panic!(
-            "timed out waiting for Wayland socket in {runtime_dir:?}\n--- sway log ---\n{}",
-            read_log(log),
-        )
-    })
-}
-
-/// Returns the path of the first entry in `dir` whose file name satisfies `matches`.
-fn find_entry(dir: &Path, matches: impl Fn(&str) -> bool) -> Option<PathBuf> {
-    fs::read_dir(dir)
-        .ok()?
-        .flatten()
-        .find_map(|entry| matches(&entry.file_name().to_string_lossy()).then(|| entry.path()))
 }
