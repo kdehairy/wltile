@@ -151,6 +151,43 @@ impl Compositor {
         })
     }
 
+    /// Spawns `wltile` without waiting for it. Needed for the no-arg `show`,
+    /// which blocks for user input and so can't go through the bounded
+    /// [`run_wltile`](Self::run_wltile).
+    pub fn spawn_wltile(&self, args: &[&str]) -> WltileChild {
+        let child = Command::new(env!("CARGO_BIN_EXE_wltile"))
+            .env("WAYLAND_DISPLAY", self.wayland_display_name())
+            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+            .args(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("failed to spawn wltile");
+        WltileChild { child }
+    }
+
+    /// Injects a single key press (types `x`) into whichever surface currently
+    /// holds keyboard focus, via `wtype` (the Wayland virtual-keyboard protocol).
+    pub fn press_key(&self) {
+        // Ignore the exit status (wtype may momentarily have no focus target),
+        // but surface a missing binary loudly rather than silently no-oping.
+        Command::new("wtype")
+            .env("WAYLAND_DISPLAY", self.wayland_display_name())
+            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+            .arg("x")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("failed to run `wtype` (is it installed in the test image?)");
+    }
+
+    fn wayland_display_name(&self) -> std::ffi::OsString {
+        self.wayland_sock
+            .file_name()
+            .expect("failed to get wayland display")
+            .to_owned()
+    }
+
     /// Returns the current output state reported by the compositor.
     pub fn outputs(&self) -> Vec<swaymsg::Output> {
         let result = self.swaymsg(&["-t", "get_outputs"]);
@@ -304,6 +341,35 @@ impl Drop for Compositor {
         self.process.kill().ok();
         self.process.wait().ok();
         fs::remove_dir_all(&self.runtime_dir).ok();
+    }
+}
+
+/// Handle to a `wltile` process spawned via [`Compositor::spawn_wltile`].
+pub struct WltileChild {
+    child: Child,
+}
+
+impl WltileChild {
+    /// Polls for exit until `timeout` elapses. A clean exit (returned here)
+    /// flushes the process's coverage profile; `None` means it's still running.
+    pub fn wait_for_exit(&mut self, timeout: Duration) -> Option<ExitStatus> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if let Ok(Some(status)) = self.child.try_wait() {
+                return Some(status);
+            }
+            if Instant::now() >= deadline {
+                return None;
+            }
+            thread::sleep(POLL_INTERVAL);
+        }
+    }
+}
+
+impl Drop for WltileChild {
+    fn drop(&mut self) {
+        self.child.kill().ok();
+        self.child.wait().ok();
     }
 }
 

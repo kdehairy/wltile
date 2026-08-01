@@ -9,6 +9,7 @@ RUN pacman -Syu --noconfirm \
         rust \
         sway \
         swaybg \
+        wtype \
     && pacman -Scc --noconfirm
 
 # cargo-llvm-cov driver (prebuilt). It shells out to the llvm tools below.
