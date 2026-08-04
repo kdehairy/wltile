@@ -10,7 +10,7 @@ INTEGRATION_TEST_CPUS ?= 4
 INTEGRATION_TEST_MEMORY ?= 16g
 
 verify:
-	@RUSTFLAGS="-Dwarnings" cargo clippy --all-targets --all-features
+	@RUSTFLAGS="-Dwarnings" cargo clippy --workspace --all-targets --all-features
 
 build:
 	@cargo build --verbose
@@ -25,7 +25,7 @@ run:
 test: unit-test integration-test
 
 unit-test:
-	@cargo test --bin wltile
+	@cargo test --workspace --lib --bins
 
 integration-test:
 	@docker build -t wltile-integration -f tests/Dockerfile .
