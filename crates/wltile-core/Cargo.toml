@@ -1,0 +1,29 @@
+[package]
+name = "wltile-core"
+description = "Output/display management for wlroots based compositors"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["wayland", "wlroots"]
+categories = ["api-bindings"]
+
+[lints]
+workspace = true
+
+[dependencies]
+crossbeam-channel.workspace = true
+errno.workspace = true
+fontdue.workspace = true
+libc.workspace = true
+serde.workspace = true
+signal-hook.workspace = true
+toml.workspace = true
+tracing.workspace = true
+wayland-client.workspace = true
+wayland-protocols.workspace = true
+wayland-protocols-wlr.workspace = true
+
+[dev-dependencies]
+image = "0.25.6"

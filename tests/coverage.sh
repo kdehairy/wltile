@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collects combined unit + integration coverage for the wltile crate.
+# Collects combined unit + integration coverage for both workspace crates.
 #
 # Run inside the coverage container (see tests/Dockerfile.coverage). The
 # integration harness spawns the instrumented `wltile` binary as a subprocess;
@@ -12,12 +12,12 @@ IGNORE='tests/|target/'
 
 cargo llvm-cov clean --workspace
 
-# Unit tests (in-process).
-cargo llvm-cov --no-report --bin wltile
+# Unit tests (in-process), across both workspace crates.
+cargo llvm-cov --no-report --workspace --lib --bins
 
 # Integration tests: drives the real binary against a headless sway. Bounded so a
 # stall can't hang the whole coverage run.
-timeout --kill-after=30s 15m cargo llvm-cov --no-report --test integration
+timeout --kill-after=30s 15m cargo llvm-cov --no-report -p wltile --test integration
 
 mkdir -p /output
 
