@@ -1,20 +1,24 @@
 use std::{
     ffi::CStr,
     io,
-    os::fd::{AsRawFd, FromRawFd, OwnedFd},
+    os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd},
 };
 
 use errno::errno;
 use libc::{
     F_ADD_SEALS, F_SEAL_GROW, F_SEAL_SEAL, F_SEAL_SHRINK, MAP_FAILED, MAP_SHARED,
-    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE, c_char, c_void, close,
+    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE, c_char, c_void,
     fcntl, ftruncate64, memfd_create, mmap, munmap,
 };
 
+/// A sealed, fixed-size memfd mapped into this process.
+///
+/// Fields are private: `Drop` relies on `addr`/`size` describing the mapping exactly, and all
+/// writes go through [`Shmem::write_at`], which bounds-checks them.
 pub(crate) struct Shmem {
-    pub fd: OwnedFd,
-    pub addr: *mut u8,
-    pub size: usize,
+    fd: OwnedFd,
+    addr: *mut u8,
+    size: usize,
 }
 
 impl Drop for Shmem {
@@ -72,6 +76,37 @@ impl Shmem {
             })
         }
     }
+
+    pub fn fd(&self) -> BorrowedFd<'_> {
+        self.fd.as_fd()
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    /// Copies `data` into the mapping starting at `offset`.
+    ///
+    /// Fails with `InvalidInput` if `offset + data.len()` would run past the end of the mapping.
+    pub fn write_at(&mut self, offset: usize, data: &[u8]) -> Result<(), io::Error> {
+        let end = offset.checked_add(data.len());
+        if end.is_none_or(|end| end > self.size) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "write of {} bytes at offset {offset} overflows shared memory of size {}",
+                    data.len(),
+                    self.size
+                ),
+            ));
+        }
+        // SAFETY: `addr` maps `size` writable bytes, and `offset + data.len() <= size` was
+        // checked above. `data` is a Rust slice, so it can't alias the mmap'd region.
+        unsafe {
+            std::ptr::copy_nonoverlapping(data.as_ptr(), self.addr.add(offset), data.len());
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -97,10 +132,8 @@ mod tests {
     #[test]
     fn full_flow() {
         let buff = "this is a test";
-        let shmem = Shmem::create(buff.len()).unwrap();
-        unsafe {
-            std::ptr::copy(buff.as_ptr(), shmem.addr, buff.len());
-        };
+        let mut shmem = Shmem::create(buff.len()).unwrap();
+        shmem.write_at(0, buff.as_bytes()).unwrap();
         unsafe {
             let addr = mmap(
                 std::ptr::null_mut(),
@@ -115,5 +148,15 @@ mod tests {
             assert_eq!(val, buff.as_bytes());
             munmap(addr.cast::<c_void>(), buff.len());
         };
+    }
+
+    #[test]
+    fn write_at_rejects_out_of_bounds() {
+        let mut shmem = Shmem::create(8).unwrap();
+        assert!(shmem.write_at(0, &[1; 8]).is_ok());
+        assert!(shmem.write_at(4, &[1; 4]).is_ok());
+        assert!(shmem.write_at(4, &[1; 5]).is_err());
+        assert!(shmem.write_at(9, &[]).is_err());
+        assert!(shmem.write_at(usize::MAX, &[1]).is_err());
     }
 }
