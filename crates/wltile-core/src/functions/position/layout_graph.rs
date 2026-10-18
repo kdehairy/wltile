@@ -1,4 +1,9 @@
-use std::collections::{HashMap, HashSet, hash_map};
+use std::{
+    collections::{HashMap, HashSet, hash_map},
+    fmt::Display,
+};
+
+use tracing::trace;
 
 use crate::{
     wl_config::{Alignment, Relation},
@@ -12,7 +17,7 @@ pub struct Edge<T> {
     target: T,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Node {
     pub(super) name: String,
     pub(super) position: Point,
@@ -131,17 +136,22 @@ impl LayoutGraph {
 
     pub fn apply(self) -> Result<Self, String> {
         let sorted_nodes = self.topological_sort()?;
+        trace!("Graph Nodes Sorted: {sorted_nodes:?}");
         if sorted_nodes.is_empty() {
             return Ok(self);
         }
         let mut applied = LayoutGraph::default();
         let first_node = self.get_node(&sorted_nodes[0]).unwrap().to_owned();
+        trace!("First Node: {first_node:?}");
         applied.ensure_node(first_node);
         for node_name in sorted_nodes {
+            trace!("Node name: {node_name}");
             let node = applied.get_node(&node_name).unwrap().clone();
             if let Some(edges) = self.get_edges_for_node(&node_name) {
                 for edge in edges {
+                    trace!("Node edge {} found", edge.relation);
                     let mut child = self.get_node(&edge.target).unwrap().clone();
+                    trace!("> edge targe: {}", child.name);
                     let mut position = match edge.relation {
                         Relation::LeftOf => Point(
                             node.position.0.saturating_sub(child.width),
@@ -214,6 +224,41 @@ impl LayoutGraph {
 
     pub(crate) fn contains(&self, name: &str) -> bool {
         self.nodes.contains_key(name)
+    }
+}
+
+/// Renders the graph as a readable tree: one line per node followed by
+/// indented lines for each of its outgoing edges.
+/// Nodes and edges are sorted so the rendering is deterministic.
+impl Display for LayoutGraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "LayoutGraph {{")?;
+        let mut nodes: Vec<&Node> = self.nodes.values().collect();
+        nodes.sort_by(|a, b| a.name.cmp(&b.name));
+        for node in nodes {
+            writeln!(
+                f,
+                "  {} ({}x{} @{})",
+                node.name, node.width, node.height, node.position
+            )?;
+            let mut edges: Vec<&Edge<String>> = self
+                .graph
+                .get(&node.name)
+                .map(|edges| edges.iter().collect())
+                .unwrap_or_default();
+            edges.sort_by(|a, b| {
+                (&a.target, a.relation.to_string(), a.alignment.to_string())
+                    .cmp(&(&b.target, b.relation.to_string(), b.alignment.to_string()))
+            });
+            for edge in edges {
+                writeln!(
+                    f,
+                    "    -{} [{}]-> {}",
+                    edge.relation, edge.alignment, edge.target
+                )?;
+            }
+        }
+        write!(f, "}}")
     }
 }
 
@@ -355,6 +400,39 @@ mod tests {
         for (i, n) in sorted.unwrap().iter().enumerate() {
             assert_eq!(i, n.parse().unwrap());
         }
+    }
+
+    #[test]
+    fn test_display() {
+        let mut dag = LayoutGraph::default();
+        dag.ensure_node(Node {
+            name: "1".into(),
+            position: Point(0, 0),
+            width: 100,
+            height: 100,
+        });
+        dag.add_edge_with_target(
+            "1",
+            Node {
+                name: "2".into(),
+                position: Point(1, 1),
+                width: 50,
+                height: 50,
+            },
+            Relation::RightOf,
+            Alignment::AlignTop,
+        );
+        dag.add_edge("2", "1", Relation::BottomOf, Alignment::AlignLeft);
+
+        let rendered = dag.to_string();
+        let expected = "\
+LayoutGraph {
+  1 (100x100 @(0, 0))
+    -right-of [align-top]-> 2
+  2 (50x50 @(1, 1))
+    -bottom-of [align-left]-> 1
+}";
+        assert_eq!(expected, rendered);
     }
 
     #[test]

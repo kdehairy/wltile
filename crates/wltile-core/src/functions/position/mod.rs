@@ -1,6 +1,6 @@
 mod layout_graph;
 
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
     functions::position::layout_graph::{LayoutGraph, Node},
@@ -51,13 +51,14 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), ClientEr
             .find(&target.name)
             .ok_or("target output does not exist")?;
         layout_graph.add_edge_with_target(
-            reference_name,
+            ref_head.name(),
             Node::try_from(target_head)?,
             relation,
             alignment,
         );
     }
 
+    trace!("Layout Graph: {layout_graph}");
     layout_graph = layout_graph.apply()?;
     let offset = layout_graph.normalize_space().unwrap();
 
