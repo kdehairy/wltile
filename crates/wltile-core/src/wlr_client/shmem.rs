@@ -23,6 +23,8 @@ pub(crate) struct Shmem {
 
 impl Drop for Shmem {
     fn drop(&mut self) {
+        // SAFETY: `addr`/`size` are exactly what `mmap` returned in `create`; the fields are
+        // private and never reassigned, and this is the only place the mapping is unmapped.
         unsafe {
             munmap(self.addr.cast::<c_void>(), self.size);
         }
@@ -35,46 +37,53 @@ impl Shmem {
     pub fn create(size: usize) -> Result<Shmem, io::Error> {
         let flags = MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_NOEXEC_SEAL;
         let seals = F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
-        unsafe {
-            let debug_name = DEBUG_NAME.as_ptr().cast::<c_char>();
-            let mut raw_fd = memfd_create(debug_name, flags);
+        let debug_name = DEBUG_NAME.as_ptr().cast::<c_char>();
+
+        // SAFETY: `debug_name` points to a NUL-terminated `'static` C string.
+        let mut raw_fd = unsafe { memfd_create(debug_name, flags) };
+        if raw_fd < 0 {
+            // MFD_NOEXEC_SEAL is not always supported. If we fail, remove it and retry
+            // SAFETY: as above.
+            raw_fd = unsafe { memfd_create(debug_name, flags & (!MFD_NOEXEC_SEAL)) };
             if raw_fd < 0 {
-                // MFD_NOEXEC_SEAL is not always supported. If we fail, remove it and retry
-                raw_fd = memfd_create(debug_name, flags & (!MFD_NOEXEC_SEAL));
-                if raw_fd < 0 {
-                    return Err(io::Error::from(errno()));
-                }
-            }
-            let fd = OwnedFd::from_raw_fd(raw_fd);
-            let res = ftruncate64(
-                fd.as_raw_fd(),
-                size.try_into().expect("buffer size is invalid"),
-            );
-            if res < 0 {
                 return Err(io::Error::from(errno()));
             }
-            let res = fcntl(fd.as_raw_fd(), F_ADD_SEALS, seals);
-            if res < 0 {
-                return Err(io::Error::from(errno()));
-            }
-            let addr = mmap(
+        }
+        // SAFETY: `memfd_create` succeeded, so `raw_fd` is an open fd that nothing else owns.
+        let fd = unsafe { OwnedFd::from_raw_fd(raw_fd) };
+
+        let len = size.try_into().expect("buffer size is invalid");
+        // SAFETY: `fd` is a valid, open fd for the duration of the call.
+        if unsafe { ftruncate64(fd.as_raw_fd(), len) } < 0 {
+            return Err(io::Error::from(errno()));
+        }
+        // SAFETY: `fd` is a valid, open fd, and `F_ADD_SEALS` takes a single `int` argument.
+        if unsafe { fcntl(fd.as_raw_fd(), F_ADD_SEALS, seals) } < 0 {
+            return Err(io::Error::from(errno()));
+        }
+
+        // SAFETY: a null hint lets the kernel choose a fresh address, so no existing mapping is
+        // replaced. `fd` is valid and was just truncated to `size` bytes, and the seals stop
+        // anyone from shrinking it later, so the whole mapping stays backed.
+        let addr = unsafe {
+            mmap(
                 std::ptr::null_mut(),
                 size, // usize is a size_t
                 PROT_WRITE | PROT_READ,
                 MAP_SHARED,
                 fd.as_raw_fd(),
                 0,
-            );
-            if addr == MAP_FAILED {
-                return Err(io::Error::from(errno()));
-            }
-
-            Ok(Shmem {
-                fd,
-                addr: addr.cast::<u8>(),
-                size,
-            })
+            )
+        };
+        if addr == MAP_FAILED {
+            return Err(io::Error::from(errno()));
         }
+
+        Ok(Shmem {
+            fd,
+            addr: addr.cast::<u8>(),
+            size,
+        })
     }
 
     pub fn fd(&self) -> BorrowedFd<'_> {
