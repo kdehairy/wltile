@@ -1,7 +1,7 @@
 use std::{
     ffi::CStr,
     io,
-    os::fd::{FromRawFd, OwnedFd},
+    os::fd::{AsRawFd, FromRawFd, OwnedFd},
 };
 
 use errno::errno;
@@ -33,21 +33,24 @@ impl Shmem {
         let seals = F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
         unsafe {
             let debug_name = DEBUG_NAME.as_ptr().cast::<c_char>();
-            let mut fd = memfd_create(debug_name, flags);
-            if fd < 0 {
+            let mut raw_fd = memfd_create(debug_name, flags);
+            if raw_fd < 0 {
                 // MFD_NOEXEC_SEAL is not always supported. If we fail, remove it and retry
-                fd = memfd_create(debug_name, flags & (!MFD_NOEXEC_SEAL));
-                if fd < 0 {
+                raw_fd = memfd_create(debug_name, flags & (!MFD_NOEXEC_SEAL));
+                if raw_fd < 0 {
                     return Err(io::Error::from(errno()));
                 }
             }
-            let res = ftruncate64(fd, size.try_into().expect("buffer size is invalid"));
+            let fd = OwnedFd::from_raw_fd(raw_fd);
+            let res = ftruncate64(
+                fd.as_raw_fd(),
+                size.try_into().expect("buffer size is invalid"),
+            );
             if res < 0 {
                 return Err(io::Error::from(errno()));
             }
-            let res = fcntl(fd, F_ADD_SEALS, seals);
+            let res = fcntl(fd.as_raw_fd(), F_ADD_SEALS, seals);
             if res < 0 {
-                close(fd);
                 return Err(io::Error::from(errno()));
             }
             let addr = mmap(
@@ -55,16 +58,15 @@ impl Shmem {
                 size, // usize is a size_t
                 PROT_WRITE | PROT_READ,
                 MAP_SHARED,
-                fd,
+                fd.as_raw_fd(),
                 0,
             );
             if addr == MAP_FAILED {
-                close(fd);
                 return Err(io::Error::from(errno()));
             }
 
             Ok(Shmem {
-                fd: OwnedFd::from_raw_fd(fd),
+                fd,
                 addr: addr.cast::<u8>(),
                 size,
             })
