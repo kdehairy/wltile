@@ -17,7 +17,7 @@ workspace = true
 tag-prefix = ""
 
 [dependencies]
-wltile-core = { path = "../wltile-core", version = "0.1.0" }
+wltile-core = { path = "../wltile-core", version = "0.1.1" }
 clap.workspace = true
 colored.workspace = true
 daemonize.workspace = true
