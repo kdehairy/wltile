@@ -257,8 +257,7 @@ impl DisplayServer {
                 );
             }
 
-            self.sh_mem_offset =
-                buffer_offset.saturating_add(isize::try_from(buff.len()).unwrap());
+            self.sh_mem_offset = buffer_offset.saturating_add(isize::try_from(buff.len()).unwrap());
 
             let commit_surface = wl_surface.clone();
             let fullscreen_toplevel = xdg_toplevel.clone();
@@ -579,7 +578,12 @@ fn rasterize_txt(txt: &str) -> (Vec<u8>, usize, usize) {
     let mut px_buff: Vec<u8> =
         vec![BACKGROUND; px_w.saturating_mul(px_h).saturating_mul(PIXEL_SIZE)];
     //ensures that all pixels are opaque
-    for px in px_buff.chunks_exact_mut(4) {
+    let (pixels, remainder) = px_buff.as_chunks_mut::<4>();
+    assert!(
+        remainder.is_empty(),
+        "pixel buffer is not divisible by 4. Corrupted"
+    );
+    for px in pixels {
         px[3] = 255;
     }
 
@@ -635,7 +639,12 @@ mod tests {
     fn rasterizing_txt() {
         let (buff, w, h) = rasterize_txt("HDMI-2");
         let mut rgba_buff = Vec::new();
-        for pixel in buff.chunks_exact(4) {
+        let (pixels, remainder) = buff.as_chunks::<4>();
+        assert!(
+            remainder.is_empty(),
+            "pixel buffer is not divisible by 4. Corrupted"
+        );
+        for pixel in pixels {
             rgba_buff.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
         }
         let img: RgbaImage =
