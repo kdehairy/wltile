@@ -1,2 +1,3 @@
 consolidate-commits = true
 pre-release-commit-message = "chore: release"
+sign-tag = true
