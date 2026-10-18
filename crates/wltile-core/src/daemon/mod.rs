@@ -1,3 +1,10 @@
+//! The daemon loop behind `wltile daemon`.
+//!
+//! It keeps a config file applied: every time outputs are connected or
+//! removed, or the process receives `SIGHUP`, it re-reads the file and
+//! applies it with [`position`](crate::position) and
+//! [`set_property`](crate::set_property).
+
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, atomic::AtomicBool},

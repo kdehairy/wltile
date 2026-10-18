@@ -7,13 +7,21 @@ use wayland_client::protocol::wl_output::Transform;
 /// The rotation variants are **counter-clockwise**, matching the protocol.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Rotation {
+    /// Not rotated.
     Normal,
+    /// Rotated 90° counter-clockwise.
     R90,
+    /// Rotated 180°.
     R180,
+    /// Rotated 270° counter-clockwise.
     R270,
+    /// Flipped around the vertical axis.
     Flipped,
+    /// Flipped, then rotated 90° counter-clockwise.
     Flipped90,
+    /// Flipped, then rotated 180°.
     Flipped180,
+    /// Flipped, then rotated 270° counter-clockwise.
     Flipped270,
     /// A transform the compositor reported that this version does not know
     /// about. `wl_output`'s `Transform` is non-exhaustive.

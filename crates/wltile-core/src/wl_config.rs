@@ -1,11 +1,25 @@
+//! The desired output configuration: which outputs to change, and how.
+//!
+//! A [`Config`] holds one [`Target`] per output. Apply it with
+//! [`position`](crate::position) for the [`Position`] of each target, and
+//! with [`set_property`](crate::set_property) for everything else.
+
 use std::fmt::Display;
 
 #[allow(clippy::enum_variant_names)]
+/// Where a target output sits relative to its reference output.
+///
+/// Parses from and displays as `left-of`, `right-of`, `top-of` and
+/// `bottom-of`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Relation {
+    /// To the left of the reference output.
     LeftOf,
+    /// To the right of the reference output.
     RightOf,
+    /// Above the reference output.
     TopOf,
+    /// Below the reference output.
     BottomOf,
 }
 
@@ -35,11 +49,24 @@ impl Display for Relation {
 }
 
 #[allow(clippy::enum_variant_names)]
+/// Which edges of the target and reference outputs line up.
+///
+/// Use [`AlignTop`](Self::AlignTop) or [`AlignBottom`](Self::AlignBottom)
+/// with [`Relation::LeftOf`] and [`Relation::RightOf`], and
+/// [`AlignLeft`](Self::AlignLeft) or [`AlignRight`](Self::AlignRight) with
+/// [`Relation::TopOf`] and [`Relation::BottomOf`].
+///
+/// Parses from and displays as `align-bottom`, `align-top`, `align-right`
+/// and `align-left`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Alignment {
+    /// Line up the bottom edges.
     AlignBottom,
+    /// Line up the top edges.
     AlignTop,
+    /// Line up the right edges.
     AlignRight,
+    /// Line up the left edges.
     AlignLeft,
 }
 
@@ -68,10 +95,17 @@ impl Display for Alignment {
     }
 }
 
+/// Where to place an output, relative to another one.
+///
+/// Parses from a string of the form `"<relation> <reference> <alignment>"`,
+/// e.g. `"left-of eDP-1 align-bottom"`, and displays the same way.
 #[derive(Debug, Clone)]
 pub struct Position {
+    /// Which side of the reference output to place the target on.
     pub relation: Relation,
+    /// The output to position against, matched like [`Heads::find`](crate::Heads::find).
     pub reference: String,
+    /// Which edges of the two outputs line up.
     pub alignment: Alignment,
 }
 
@@ -109,16 +143,28 @@ impl Display for Position {
     }
 }
 
+/// The changes wanted for one output.
+///
+/// Every property is optional; `None` leaves it as it is.
 #[derive(Debug, Default, Clone)]
 pub struct Target {
+    /// The output to change, matched like [`Heads::find`](crate::Heads::find).
     pub name: String,
+    /// Where to place the output. Applied by [`position`](crate::position).
     pub position: Option<Position>,
+    /// The scale factor, e.g. `2.0` for a high-DPI display.
     pub scale: Option<f64>,
+    /// An index into the output's [`modes`](crate::Head::modes), sorted
+    /// from largest to smallest (by resolution, then refresh rate).
     pub mode: Option<usize>,
+    /// The rotation in degrees. Must be a multiple of 90; positive values
+    /// rotate the image clockwise.
     pub rotation: Option<i32>,
+    /// Whether the output is enabled (`true`) or disabled (`false`).
     pub active: Option<bool>,
 }
 impl Target {
+    /// Creates a target for the output `name`, with every property unset.
     #[must_use]
     pub fn new(name: String) -> Self {
         Self {
@@ -151,16 +197,22 @@ impl Display for Target {
     }
 }
 
+/// A set of [`Target`]s to apply together.
+///
+/// Build one by hand with [`add_target`](Self::add_target), or load it from
+/// a TOML file (see [`config_file::parser`](crate::config_file::parser)).
 #[derive(Debug, Default)]
 pub struct Config {
     targets: Vec<Target>,
 }
 
 impl Config {
+    /// Adds a target to the config.
     pub fn add_target(&mut self, target: Target) {
         self.targets.push(target);
     }
 
+    /// The targets, in the order they were added.
     #[must_use]
     pub fn targets(&self) -> &Vec<Target> {
         &self.targets

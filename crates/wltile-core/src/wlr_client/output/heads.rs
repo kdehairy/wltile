@@ -10,6 +10,11 @@ use crate::wlr_client::output::rotation::Rotation;
 use crate::wlr_client::output::wlr_mode::OutputMode;
 use crate::wlr_client::point::Point;
 
+/// A snapshot of the connected outputs, as returned by
+/// [`Client::heads`](crate::Client::heads).
+///
+/// It doesn't update; call [`Client::heads`](crate::Client::heads) again for
+/// fresh data.
 #[derive(Default)]
 pub struct Heads {
     heads: HashMap<String, Head>,
@@ -20,11 +25,16 @@ impl Heads {
         self.heads.insert(name, head);
     }
 
+    /// All outputs in the snapshot, in no particular order.
     #[must_use]
     pub fn heads(&self) -> Vec<&Head> {
         self.heads.values().collect()
     }
 
+    /// Finds an output by its name (`eDP-1`), its serial number, or a
+    /// case-insensitive substring of its make (`dell`).
+    ///
+    /// If more than one output matches, any one of them may be returned.
     #[must_use]
     pub fn find(&self, expr: &str) -> Option<&Head> {
         self.heads().into_iter().find(|&head| {
@@ -35,6 +45,9 @@ impl Heads {
     }
 }
 
+/// A video mode an output supports: a resolution and a refresh rate.
+///
+/// Modes are ordered by resolution (see [`Point`]), then by refresh rate.
 #[derive(Eq, PartialEq, Clone)]
 pub struct Mode {
     id: u32,
@@ -53,21 +66,27 @@ impl Mode {
         }
     }
 
+    /// An identifier for this mode, assigned by the [`Client`](crate::Client)
+    /// that produced it. Only meaningful within that client.
     #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
+    /// The resolution in pixels, as `(width, height)`.
     #[must_use]
     pub fn size(&self) -> Point {
         self.size
     }
 
+    /// The refresh rate in mHz (e.g. `60000` for 60 Hz).
     #[must_use]
     pub fn refresh(&self) -> i32 {
         self.refresh
     }
 
+    /// Whether this is the output's preferred mode, usually its native
+    /// resolution.
     #[must_use]
     pub fn prefered(&self) -> bool {
         self.prefered
@@ -90,6 +109,7 @@ impl PartialOrd for Mode {
     }
 }
 
+/// One output (display) as the compositor reports it.
 #[derive(PartialEq, Clone)]
 pub struct Head {
     id: u32,
@@ -145,61 +165,78 @@ impl Head {
         })
     }
 
+    /// An identifier for this output, assigned by the
+    /// [`Client`](crate::Client) that produced it. Only meaningful within that
+    /// client.
     #[must_use]
     pub fn id(&self) -> u32 {
         self.id
     }
 
+    /// The current mode, or `None` if the output is disabled.
     #[must_use]
     pub fn mode(&self) -> Option<&Mode> {
         self.current_mode.as_ref()
     }
 
+    /// The connector name, e.g. `eDP-1` or `DP-2`.
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// The serial number, or an empty string if the output doesn't report one.
     #[must_use]
     pub fn serial_number(&self) -> &str {
         &self.serial_number
     }
 
+    /// Whether the output is enabled.
     #[must_use]
     pub fn enabled(&self) -> bool {
         self.enabled
     }
 
+    /// The manufacturer, e.g. `Dell Inc.`.
     #[must_use]
     pub fn make(&self) -> &str {
         &self.make
     }
 
+    /// The model name, e.g. `DELL S3423DWC`.
     #[must_use]
     pub fn model(&self) -> &str {
         &self.model
     }
 
+    /// The top-left corner of the output in the compositor's layout, in
+    /// logical pixels.
     #[must_use]
     pub fn position(&self) -> Point {
         self.position
     }
 
+    /// The physical size in millimeters, as `(width, height)`. `(0, 0)` if
+    /// unknown.
     #[must_use]
     pub fn physical_size(&self) -> Point {
         self.physical_size
     }
 
+    /// Every mode the output supports, in the order the compositor
+    /// advertised them.
     #[must_use]
     pub fn modes(&self) -> &Vec<Mode> {
         &self.modes
     }
 
+    /// The scale factor, e.g. `2.0` for a high-DPI display.
     #[must_use]
     pub fn scale(&self) -> f64 {
         self.scale
     }
 
+    /// How the output's image is rotated and/or flipped.
     #[must_use]
     pub fn rotation(&self) -> Rotation {
         Rotation::from(self.transform)
