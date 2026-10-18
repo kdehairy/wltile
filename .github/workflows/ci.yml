@@ -6,6 +6,7 @@ on:
       - main
     tags:
       - "v*"
+      - "wltile-core-v*"
   pull_request:
 
 jobs:
@@ -66,7 +67,8 @@ jobs:
     needs:
       - rust-latest
       - integration-test
-    if: startsWith(github.ref, 'refs/tags/v')
+    # `vX.Y.Z` tags release wltile; `wltile-core-vX.Y.Z` tags release wltile-core.
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/wltile-core-v')
     permissions:
       contents: write
     steps:
@@ -77,3 +79,5 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
+          # Keep the repo's "Latest" release pointing at the wltile CLI.
+          make_latest: ${{ startsWith(github.ref, 'refs/tags/v') }}

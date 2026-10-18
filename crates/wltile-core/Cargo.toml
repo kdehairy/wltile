@@ -1,7 +1,7 @@
 [package]
 name = "wltile-core"
 description = "Output/display management for wlroots based compositors"
-version.workspace = true
+version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 repository.workspace = true
@@ -11,6 +11,9 @@ categories = ["api-bindings"]
 
 [lints]
 workspace = true
+
+[package.metadata.release]
+tag-prefix = "{{crate_name}}-"
 
 [dependencies]
 crossbeam-channel.workspace = true
