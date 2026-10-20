@@ -5,8 +5,8 @@ use wayland_client::protocol::wl_output::Transform;
 
 use crate::wlr_client::errors::ClientError;
 use crate::wlr_client::output::configs::Configurations;
-use crate::wlr_client::output::wlr_head::OutputHead;
 use crate::wlr_client::output::rotation::Rotation;
+use crate::wlr_client::output::wlr_head::OutputHead;
 use crate::wlr_client::output::wlr_mode::OutputMode;
 use crate::wlr_client::point::Point;
 

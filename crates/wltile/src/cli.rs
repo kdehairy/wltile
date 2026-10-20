@@ -242,9 +242,9 @@ pub(crate) fn validate(args: &Cli) -> Result<(), String> {
             (Relation::TopOf | Relation::BottomOf, Alignment::AlignBottom) => Err(String::from(
                 "Impossible to align bottom on a vertical setup",
             )),
-            (Relation::TopOf | Relation::BottomOf, Alignment::AlignTop) => Err(String::from(
-                "Impossible to align top on a vertical setup",
-            )),
+            (Relation::TopOf | Relation::BottomOf, Alignment::AlignTop) => {
+                Err(String::from("Impossible to align top on a vertical setup"))
+            }
             _ => Ok(()),
         },
         _ => Ok(()),
@@ -395,7 +395,14 @@ mod tests {
     #[test]
     fn parses_daemon_with_all_flags() {
         match parse(&[
-            "wltile", "daemon", "--config", "/c.toml", "--log", "/l.log", "--err", "/e.log",
+            "wltile",
+            "daemon",
+            "--config",
+            "/c.toml",
+            "--log",
+            "/l.log",
+            "--err",
+            "/e.log",
             "--systemd",
         ])
         .command
@@ -473,10 +480,26 @@ mod tests {
     #[test]
     fn set_rejects_values_that_do_not_match_the_property() {
         let cases = [
-            (Property::Mode, "1.5", "Expected integer identifier for the mode"),
-            (Property::Scale, "big", "Expected number identifier for the scale"),
-            (Property::Rotation, "1.5", "Expected number identifier for the rotation"),
-            (Property::Active, "yes", "Expected 'true' or 'false' for active"),
+            (
+                Property::Mode,
+                "1.5",
+                "Expected integer identifier for the mode",
+            ),
+            (
+                Property::Scale,
+                "big",
+                "Expected number identifier for the scale",
+            ),
+            (
+                Property::Rotation,
+                "1.5",
+                "Expected number identifier for the rotation",
+            ),
+            (
+                Property::Active,
+                "yes",
+                "Expected 'true' or 'false' for active",
+            ),
         ];
         for (property, value, expected) in cases {
             let err = target_from_set(String::from("A"), property, value)
@@ -490,7 +513,6 @@ mod tests {
         let target = target_from_set(String::from("HDMI-1"), Property::Scale, "1").expect("valid");
         assert_eq!(target.name, "HDMI-1");
     }
-
 
     #[test]
     fn relation_display_renders_kebab_case() {

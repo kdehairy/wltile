@@ -359,8 +359,11 @@ impl Display for LayoutGraph {
                 .map(|edges| edges.iter().collect())
                 .unwrap_or_default();
             edges.sort_by(|a, b| {
-                (&a.target, a.relation.to_string(), a.alignment.to_string())
-                    .cmp(&(&b.target, b.relation.to_string(), b.alignment.to_string()))
+                (&a.target, a.relation.to_string(), a.alignment.to_string()).cmp(&(
+                    &b.target,
+                    b.relation.to_string(),
+                    b.alignment.to_string(),
+                ))
             });
             for edge in edges {
                 writeln!(

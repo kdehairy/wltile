@@ -15,8 +15,8 @@ pub trait TryFrom<T>: Sized {
 }
 
 impl TryFrom<i32> for Transform {
-    /// Maps a requested **image** rotation 
-    /// to the equivalent `wl_output` `Transform`. The protocol's rotation 
+    /// Maps a requested **image** rotation
+    /// to the equivalent `wl_output` `Transform`. The protocol's rotation
     /// variants (`_90`/`_180`/`_270`) are **counter-clockwise**.
     fn try_from(other: i32) -> Result<Self, String> {
         let norm = other % 360;

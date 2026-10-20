@@ -11,6 +11,7 @@ INTEGRATION_TEST_MEMORY ?= 16g
 
 verify:
 	@RUSTFLAGS="-Dwarnings" cargo clippy --workspace --all-targets --all-features
+	@cargo fmt --check
 
 build:
 	@cargo build --verbose
