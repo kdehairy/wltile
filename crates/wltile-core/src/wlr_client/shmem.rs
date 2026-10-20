@@ -8,7 +8,7 @@ use errno::errno;
 use libc::{
     F_ADD_SEALS, F_SEAL_GROW, F_SEAL_SEAL, F_SEAL_SHRINK, MAP_FAILED, MAP_SHARED,
     MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE, c_char, c_void, fcntl,
-    ftruncate64, memfd_create, mmap, munmap,
+    ftruncate64, memfd_create, mmap, munmap, off_t,
 };
 
 /// A sealed, fixed-size memfd mapped into this process.
@@ -34,7 +34,17 @@ impl Drop for Shmem {
 const DEBUG_NAME: &CStr = c"wltileshmem";
 
 impl Shmem {
+    /// Creates a sealed memfd of `size` bytes and maps it into this process.
+    ///
+    /// Fails with `InvalidInput` if `size` is zero or too large to be an `off_t`; `mmap` rejects a
+    /// zero length mapping, and the pool needs to address every byte of it.
     pub fn create(size: usize) -> Result<Shmem, io::Error> {
+        if size == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "shared memory size must be non-zero",
+            ));
+        }
         let flags = MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_NOEXEC_SEAL;
         let seals = F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL;
         let debug_name = DEBUG_NAME.as_ptr().cast::<c_char>();
@@ -52,7 +62,12 @@ impl Shmem {
         // SAFETY: `memfd_create` succeeded, so `raw_fd` is an open fd that nothing else owns.
         let fd = unsafe { OwnedFd::from_raw_fd(raw_fd) };
 
-        let len = size.try_into().expect("buffer size is invalid");
+        let len = off_t::try_from(size).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("shared memory size {size} is out of range"),
+            )
+        })?;
         // SAFETY: `fd` is a valid, open fd for the duration of the call.
         if unsafe { ftruncate64(fd.as_raw_fd(), len) } < 0 {
             return Err(io::Error::from(errno()));

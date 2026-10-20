@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -99,11 +98,12 @@ const FONT_SIZE: f32 = 128.0;
 const BACKGROUND: u8 = 128;
 const BORDER_SIZE: usize = 25;
 
-/// Turns a rejected shared memory write into a display error, logging it on the way.
+/// Logs a shared memory failure and turns it into a display error.
 ///
 /// A function rather than a method: the repaint path holds a `&mut Surface` borrowed through the
-/// `state` write guard, so borrowing all of `DisplayServer` here would not compile.
-fn shmem_error(err: &io::Error) -> ClientError {
+/// `state` write guard, so borrowing all of `DisplayServer` here would not compile. Generic over
+/// the error so it can be passed straight to `map_err`.
+fn shmem_error<E: std::fmt::Display>(err: E) -> ClientError {
     error!("{err}");
     ClientError::Display {
         msg: err.to_string(),
@@ -125,8 +125,13 @@ impl DisplayServer {
 
         let (buff, ..) = rasterize_txt("HDMI-2HDMI-2".repeat(wl_outputs.len()).as_str());
         debug!("Estemated display buffer: size: {}", buff.len());
-        let sh_mem: Shmem = Shmem::create(buff.len()).unwrap();
-        let size = i32::try_from(buff.len()).unwrap();
+        let sh_mem: Shmem = Shmem::create(buff.len()).map_err(shmem_error)?;
+        let size = i32::try_from(buff.len()).map_err(|_| ClientError::Display {
+            msg: format!(
+                "estimated display buffer of {} bytes is larger than a wayland shm pool allows",
+                buff.len()
+            ),
+        })?;
         let wl_pool: WlShmPool = wl_shm.create_pool(sh_mem.fd(), size, &queue_handle, ());
 
         let display_state = Arc::new(RwLock::new(DisplayState {
@@ -206,7 +211,7 @@ impl DisplayServer {
             // name. But from the display module perspective, it does not know that.
             self.sh_mem
                 .write_at(s.sh_mem_offset, &buff)
-                .map_err(|err| shmem_error(&err))?;
+                .map_err(shmem_error)?;
             s.state = State::Ready;
             drop(rw_lock);
         } else {
@@ -233,7 +238,7 @@ impl DisplayServer {
             self.sh_mem_offset = self
                 .sh_mem
                 .write_at(buffer_offset, &buff)
-                .map_err(|err| shmem_error(&err))?;
+                .map_err(shmem_error)?;
 
             let wl_buff = self.wl_pool.create_buffer(
                 i32::try_from(buffer_offset).unwrap(),
