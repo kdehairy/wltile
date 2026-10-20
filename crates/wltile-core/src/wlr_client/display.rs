@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::os::fd::AsFd;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -61,7 +60,7 @@ struct DisplayState {
 struct Surface {
     wl_surface: WlSurface,
     wl_buff: WlBuffer,
-    sh_mem_offset: isize,
+    sh_mem_offset: usize,
     xdg_surface: XdgSurface,
     xdg_toplevel: XdgToplevel,
     state: State,
@@ -83,7 +82,7 @@ type AsyncState = Arc<RwLock<DisplayState>>;
 pub struct DisplayServer {
     queue_handle: QueueHandle<StateWrapper>,
     sh_mem: Shmem,
-    sh_mem_offset: isize,
+    sh_mem_offset: usize,
     wl_shm: WlShm,
     wl_pool: WlShmPool,
     wl_compositor: WlCompositor,
@@ -98,6 +97,18 @@ const PIXEL_SIZE: usize = 4; //bytes
 const FONT_SIZE: f32 = 128.0;
 const BACKGROUND: u8 = 128;
 const BORDER_SIZE: usize = 25;
+
+/// Logs a shared memory failure and turns it into a display error.
+///
+/// A function rather than a method: the repaint path holds a `&mut Surface` borrowed through the
+/// `state` write guard, so borrowing all of `DisplayServer` here would not compile. Generic over
+/// the error so it can be passed straight to `map_err`.
+fn shmem_error<E: std::fmt::Display>(err: E) -> ClientError {
+    error!("{err}");
+    ClientError::Display {
+        msg: err.to_string(),
+    }
+}
 
 impl DisplayServer {
     pub(super) fn start(
@@ -114,9 +125,14 @@ impl DisplayServer {
 
         let (buff, ..) = rasterize_txt("HDMI-2HDMI-2".repeat(wl_outputs.len()).as_str());
         debug!("Estemated display buffer: size: {}", buff.len());
-        let sh_mem: Shmem = Shmem::create(buff.len()).unwrap();
-        let size = i32::try_from(buff.len()).unwrap();
-        let wl_pool: WlShmPool = wl_shm.create_pool(sh_mem.fd.as_fd(), size, &queue_handle, ());
+        let sh_mem: Shmem = Shmem::create(buff.len()).map_err(shmem_error)?;
+        let size = i32::try_from(buff.len()).map_err(|_| ClientError::Display {
+            msg: format!(
+                "estimated display buffer of {} bytes is larger than a wayland shm pool allows",
+                buff.len()
+            ),
+        })?;
+        let wl_pool: WlShmPool = wl_shm.create_pool(sh_mem.fd(), size, &queue_handle, ());
 
         let display_state = Arc::new(RwLock::new(DisplayState {
             format: None,
@@ -164,15 +180,6 @@ impl DisplayServer {
 
     pub(crate) fn write(&mut self, text: &str, head: Option<&Head>) -> Result<(), ClientError> {
         let (buff, width, height) = rasterize_txt(text);
-        if buff.len() > self.sh_mem.size {
-            error!(
-                "Display buffer of size '{}' is too small for pixel buffer",
-                self.sh_mem.size
-            );
-            return Err(ClientError::Display {
-                msg: String::from("Pixel buffer is bigger than the display buffer"),
-            });
-        }
         debug!(
             "Pixel buffer size: {}, w:{}, h:{}",
             buff.len(),
@@ -197,17 +204,14 @@ impl DisplayServer {
         }
 
         if let Some(s) = stored_surface {
-            unsafe {
-                std::ptr::copy(
-                    buff.as_ptr(),
-                    //FIXME: This is assuming that the same text (in size) is being displayed.
-                    // If this assumption breaks the pixel buffer will overflow to the next.
-                    // This is fine globally for the crate, since we are always writing the output
-                    // name. But from the display module perspective, it does not know that.
-                    self.sh_mem.addr.offset(s.sh_mem_offset),
-                    buff.len(),
-                );
-            };
+            //FIXME: This is assuming that the same text (in size) is being displayed.
+            // If this assumption breaks the pixel buffer will overflow into the next surface's
+            // buffer. `write_at` only guards the end of the shared memory, not neighbours.
+            // This is fine globally for the crate, since we are always writing the output
+            // name. But from the display module perspective, it does not know that.
+            self.sh_mem
+                .write_at(s.sh_mem_offset, &buff)
+                .map_err(shmem_error)?;
             s.state = State::Ready;
             drop(rw_lock);
         } else {
@@ -229,6 +233,13 @@ impl DisplayServer {
             // Offset into the shared pool where this surface's buffer will lives.
             let buffer_offset = self.sh_mem_offset;
 
+            // Write before creating any protocol objects, so running out of space leaves
+            // nothing half-built behind.
+            self.sh_mem_offset = self
+                .sh_mem
+                .write_at(buffer_offset, &buff)
+                .map_err(shmem_error)?;
+
             let wl_buff = self.wl_pool.create_buffer(
                 i32::try_from(buffer_offset).unwrap(),
                 i32::try_from(width).unwrap(),
@@ -244,20 +255,6 @@ impl DisplayServer {
                 .xdg_wm_base
                 .get_xdg_surface(&wl_surface, &self.queue_handle, ());
             let xdg_toplevel = xdg_surface.get_toplevel(&self.queue_handle, ());
-
-            unsafe {
-                std::ptr::copy(
-                    buff.as_ptr(),
-                    //FIXME: We need to check first if from this offset forward we have enough space
-                    // in the shmem.
-                    // It's Ok from the whole crate perspective, since we are always going through
-                    // the outputs once, and we allocate enough buffer for them all (and a bit more).
-                    self.sh_mem.addr.offset(buffer_offset),
-                    buff.len(),
-                );
-            }
-
-            self.sh_mem_offset = buffer_offset.saturating_add(isize::try_from(buff.len()).unwrap());
 
             let commit_surface = wl_surface.clone();
             let fullscreen_toplevel = xdg_toplevel.clone();

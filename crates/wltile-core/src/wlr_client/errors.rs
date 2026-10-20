@@ -6,16 +6,41 @@ use wayland_client::{
     globals::{BindError, GlobalError},
 };
 
+/// Everything that can go wrong while talking to the compositor.
+///
+/// Each variant carries a human-readable message describing the failure.
 #[derive(Debug)]
 pub enum ClientError {
-    General { msg: String },
-    Connection { msg: String },
-    Binding { msg: String },
-    Dispatch { msg: String },
-    Display { msg: String },
+    /// Any other failure, such as a missing output or an invalid property value.
+    General {
+        /// What went wrong.
+        msg: String,
+    },
+    /// Couldn't connect to the Wayland display, or the connection broke.
+    Connection {
+        /// What went wrong.
+        msg: String,
+    },
+    /// The compositor doesn't offer a required protocol, or not at the
+    /// required version.
+    Binding {
+        /// What went wrong.
+        msg: String,
+    },
+    /// Dispatching events from the compositor failed.
+    Dispatch {
+        /// What went wrong.
+        msg: String,
+    },
+    /// Drawing on an output failed (used by [`show`](crate::show)).
+    Display {
+        /// What went wrong.
+        msg: String,
+    },
 }
 
 impl ClientError {
+    /// Creates a [`ClientError::General`] with the given message.
     #[must_use]
     pub fn general(msg: String) -> ClientError {
         ClientError::General { msg }

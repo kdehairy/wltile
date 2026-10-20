@@ -1,5 +1,9 @@
 use std::fmt::Display;
 
+/// A pair of integers: `(x, y)` for positions, `(width, height)` for sizes.
+///
+/// Displays as `(x, y)`. Points are ordered by their distance from the
+/// origin, so for sizes a larger area generally sorts higher.
 #[derive(Debug, Default, PartialEq, Clone, Copy, Eq, Hash)]
 pub struct Point(pub i32, pub i32);
 

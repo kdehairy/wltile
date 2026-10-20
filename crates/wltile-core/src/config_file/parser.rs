@@ -1,3 +1,21 @@
+//! TOML parsing for [`Config`].
+//!
+//! This module adds two ways to build a [`Config`]: [`str::parse`] (through
+//! `FromStr`) and `Config::try_from(&Path)`. Each top-level table is one
+//! [`Target`], keyed by the output it applies to:
+//!
+//! ```toml
+//! [eDP-1]
+//! scale = 2
+//!
+//! [dell]
+//! position = "left-of eDP-1 align-bottom"
+//! mode = 0
+//! rotation = 90
+//! ```
+//!
+//! The `active` property can't be set from a config file.
+
 use std::{fs, io::Read, path::Path, str::FromStr};
 
 use serde::Deserialize;
@@ -9,6 +27,17 @@ use crate::wl_config::{Config, Position, Target};
 impl FromStr for Config {
     type Err = String;
 
+    /// Parses a config file's contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a `position` value is not a valid
+    /// [`Position`] (`"<relation> <reference> <alignment>"`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `s` is not valid TOML, or if a table has a property of the
+    /// wrong type.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         #[derive(Debug, Deserialize)]
         struct T {
@@ -43,6 +72,16 @@ impl FromStr for Config {
 impl TryFrom<&Path> for Config {
     type Error = String;
 
+    /// Reads and parses the config file at `path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as parsing the contents with [`str::parse`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the file can't be opened or read, or in the same cases
+    /// as parsing the contents with [`str::parse`].
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         debug!("parsing file {:?}", path);
         let mut file = fs::File::open(path).unwrap();

@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Crashing in `show` when an overlay did not fit the shared memory pool, instead of reporting an
+  error.
+- Leaking the shared memory file descriptor when preparing the overlay buffer failed.
 
 ## [v1.3.2]
 ### Fixed

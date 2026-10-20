@@ -98,7 +98,9 @@ impl ConfigurationsReadLock {
 
 /// wlroots client that handles communication with the compositor.
 ///
-/// The client is unusable until the first invokation of `connect()` method.
+/// [`Client::new`] connects to the compositor and starts a background thread
+/// that keeps a cache of its outputs up to date. Every other function in this
+/// crate works through a `Client`.
 pub struct Client {
     configurations: AsyncState,
     output_manager: ZwlrOutputManagerV1,
