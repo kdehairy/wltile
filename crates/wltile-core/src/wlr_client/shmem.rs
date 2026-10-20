@@ -90,10 +90,6 @@ impl Shmem {
         self.fd.as_fd()
     }
 
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
     /// Copies `data` into the mapping starting at `offset`.
     ///
     /// Returns the offset one past the written bytes, ready to be used as the offset of the next

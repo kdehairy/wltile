@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -98,6 +99,17 @@ const FONT_SIZE: f32 = 128.0;
 const BACKGROUND: u8 = 128;
 const BORDER_SIZE: usize = 25;
 
+/// Turns a rejected shared memory write into a display error, logging it on the way.
+///
+/// A function rather than a method: the repaint path holds a `&mut Surface` borrowed through the
+/// `state` write guard, so borrowing all of `DisplayServer` here would not compile.
+fn shmem_error(err: &io::Error) -> ClientError {
+    error!("{err}");
+    ClientError::Display {
+        msg: err.to_string(),
+    }
+}
+
 impl DisplayServer {
     pub(super) fn start(
         conn_man: &mut ConnectionManager,
@@ -163,15 +175,6 @@ impl DisplayServer {
 
     pub(crate) fn write(&mut self, text: &str, head: Option<&Head>) -> Result<(), ClientError> {
         let (buff, width, height) = rasterize_txt(text);
-        if buff.len() > self.sh_mem.size() {
-            error!(
-                "Display buffer of size '{}' is too small for pixel buffer",
-                self.sh_mem.size()
-            );
-            return Err(ClientError::Display {
-                msg: String::from("Pixel buffer is bigger than the display buffer"),
-            });
-        }
         debug!(
             "Pixel buffer size: {}, w:{}, h:{}",
             buff.len(),
@@ -203,7 +206,7 @@ impl DisplayServer {
             // name. But from the display module perspective, it does not know that.
             self.sh_mem
                 .write_at(s.sh_mem_offset, &buff)
-                .map_err(|e| ClientError::Display { msg: e.to_string() })?;
+                .map_err(|err| shmem_error(&err))?;
             s.state = State::Ready;
             drop(rw_lock);
         } else {
@@ -230,7 +233,7 @@ impl DisplayServer {
             self.sh_mem_offset = self
                 .sh_mem
                 .write_at(buffer_offset, &buff)
-                .map_err(|e| ClientError::Display { msg: e.to_string() })?;
+                .map_err(|err| shmem_error(&err))?;
 
             let wl_buff = self.wl_pool.create_buffer(
                 i32::try_from(buffer_offset).unwrap(),
