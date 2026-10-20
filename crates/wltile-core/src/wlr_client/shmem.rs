@@ -7,8 +7,8 @@ use std::{
 use errno::errno;
 use libc::{
     F_ADD_SEALS, F_SEAL_GROW, F_SEAL_SEAL, F_SEAL_SHRINK, MAP_FAILED, MAP_SHARED,
-    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE, c_char, c_void,
-    fcntl, ftruncate64, memfd_create, mmap, munmap,
+    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_NOEXEC_SEAL, PROT_READ, PROT_WRITE, c_char, c_void, fcntl,
+    ftruncate64, memfd_create, mmap, munmap,
 };
 
 /// A sealed, fixed-size memfd mapped into this process.
