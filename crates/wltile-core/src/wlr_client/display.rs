@@ -227,10 +227,10 @@ impl DisplayServer {
 
             // Write before creating any protocol objects, so running out of space leaves
             // nothing half-built behind.
-            self.sh_mem
+            self.sh_mem_offset = self
+                .sh_mem
                 .write_at(buffer_offset, &buff)
                 .map_err(|e| ClientError::Display { msg: e.to_string() })?;
-            self.sh_mem_offset = buffer_offset.saturating_add(buff.len());
 
             let wl_buff = self.wl_pool.create_buffer(
                 i32::try_from(buffer_offset).unwrap(),

@@ -96,25 +96,30 @@ impl Shmem {
 
     /// Copies `data` into the mapping starting at `offset`.
     ///
-    /// Fails with `InvalidInput` if `offset + data.len()` would run past the end of the mapping.
-    pub fn write_at(&mut self, offset: usize, data: &[u8]) -> Result<(), io::Error> {
-        let end = offset.checked_add(data.len());
-        if end.is_none_or(|end| end > self.size) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "write of {} bytes at offset {offset} overflows shared memory of size {}",
-                    data.len(),
-                    self.size
-                ),
-            ));
-        }
-        // SAFETY: `addr` maps `size` writable bytes, and `offset + data.len() <= size` was
-        // checked above. `data` is a Rust slice, so it can't alias the mmap'd region.
+    /// Returns the offset one past the written bytes, ready to be used as the offset of the next
+    /// write. Fails with `InvalidInput` if `offset + data.len()` would run past the end of the
+    /// mapping, in which case nothing is written.
+    pub fn write_at(&mut self, offset: usize, data: &[u8]) -> Result<usize, io::Error> {
+        let end = offset
+            .checked_add(data.len())
+            .filter(|end| *end <= self.size)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "write of {} bytes at offset {offset} overflows shared memory of size {}",
+                        data.len(),
+                        self.size
+                    ),
+                )
+            })?;
+        // SAFETY: `addr` maps `size` writable bytes, and `offset + data.len() == end <= size` was
+        // checked above, so the destination stays inside the mapping. `data` is a Rust slice, so
+        // it can't alias the mmap'd region.
         unsafe {
             std::ptr::copy_nonoverlapping(data.as_ptr(), self.addr.add(offset), data.len());
         }
-        Ok(())
+        Ok(end)
     }
 }
 
