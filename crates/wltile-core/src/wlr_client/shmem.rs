@@ -38,7 +38,7 @@ impl Shmem {
     ///
     /// Fails with `InvalidInput` if `size` is zero or too large to be an `off_t`; `mmap` rejects a
     /// zero length mapping, and the pool needs to address every byte of it.
-    pub fn create(size: usize) -> Result<Shmem, io::Error> {
+    pub(crate) fn create(size: usize) -> Result<Shmem, io::Error> {
         if size == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -101,7 +101,7 @@ impl Shmem {
         })
     }
 
-    pub fn fd(&self) -> BorrowedFd<'_> {
+    pub(crate) fn fd(&self) -> BorrowedFd<'_> {
         self.fd.as_fd()
     }
 
@@ -110,7 +110,7 @@ impl Shmem {
     /// Returns the offset one past the written bytes, ready to be used as the offset of the next
     /// write. Fails with `InvalidInput` if `offset + data.len()` would run past the end of the
     /// mapping, in which case nothing is written.
-    pub fn write_at(&mut self, offset: usize, data: &[u8]) -> Result<usize, io::Error> {
+    pub(crate) fn write_at(&mut self, offset: usize, data: &[u8]) -> Result<usize, io::Error> {
         let end = offset
             .checked_add(data.len())
             .filter(|end| *end <= self.size)
