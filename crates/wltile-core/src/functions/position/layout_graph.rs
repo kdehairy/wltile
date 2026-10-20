@@ -251,8 +251,8 @@ impl LayoutGraph {
                     let mut child = self.get_node(&edge.target).unwrap().clone();
                     trace!("> edge targe: {}", child.name);
                     // Step 1: the relation fixes the axis the outputs touch on.
-                    // The other coordinate is a placeholder the alignment below
-                    // is expected to overwrite.
+                    // The other coordinate is the child's current one, a
+                    // placeholder the alignment below is expected to overwrite.
                     let mut position = match edge.relation {
                         Relation::LeftOf => Point(
                             node.position.0.saturating_sub(child.width),
@@ -261,12 +261,14 @@ impl LayoutGraph {
                         Relation::RightOf => {
                             Point(node.position.0.saturating_add(node.width), child.position.1)
                         }
-                        Relation::TopOf => {
-                            Point(child.width, node.position.1.saturating_sub(child.height))
-                        }
-                        Relation::BottomOf => {
-                            Point(child.width, node.position.1.saturating_add(node.height))
-                        }
+                        Relation::TopOf => Point(
+                            child.position.0,
+                            node.position.1.saturating_sub(child.height),
+                        ),
+                        Relation::BottomOf => Point(
+                            child.position.0,
+                            node.position.1.saturating_add(node.height),
+                        ),
                     };
                     // Step 2: the alignment fixes the other axis. Nothing checks
                     // that it is perpendicular to the relation (see `Alignment`);
@@ -592,5 +594,53 @@ LayoutGraph {
         assert_eq!(Point(100, 0), applied.get_node("3").unwrap().position);
         assert_eq!(Point(0, 100), applied.get_node("2").unwrap().position);
         assert_eq!(Point(100, 100), applied.get_node("1").unwrap().position);
+    }
+
+    /// An alignment on the same axis as the relation overwrites the coordinate
+    /// the relation just set (the CLI rejects those pairs, the config file does
+    /// not yet), so the coordinate left in place is the one from the relation
+    /// step: the child's current one, never its width or height.
+    #[test]
+    fn test_apply_parallel_alignment_keeps_child_coordinate() {
+        // reference "1": (100, 100) 200x200, child "2": (700, 900) 120x60.
+        // Every expected position is far from 120 and 60, so a size leaking into
+        // a coordinate cannot pass it by coincidence.
+        let solve = |relation, alignment| {
+            let mut dag = LayoutGraph::default();
+            dag.ensure_node(Node {
+                name: "1".into(),
+                position: Point(100, 100),
+                width: 200,
+                height: 200,
+            });
+            dag.add_edge_with_target(
+                "1",
+                Node {
+                    name: "2".into(),
+                    position: Point(700, 900),
+                    width: 120,
+                    height: 60,
+                },
+                relation,
+                alignment,
+            );
+
+            dag.apply().unwrap().get_node("2").unwrap().position
+        };
+
+        // The aligned axis follows the reference, the other one stays at 700/900.
+        assert_eq!(Point(700, 100), solve(Relation::TopOf, Alignment::AlignTop));
+        assert_eq!(
+            Point(700, 240),
+            solve(Relation::BottomOf, Alignment::AlignBottom)
+        );
+        assert_eq!(
+            Point(100, 900),
+            solve(Relation::LeftOf, Alignment::AlignLeft)
+        );
+        assert_eq!(
+            Point(180, 900),
+            solve(Relation::RightOf, Alignment::AlignRight)
+        );
     }
 }

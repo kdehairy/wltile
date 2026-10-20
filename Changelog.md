@@ -5,6 +5,7 @@
 - Crashing in `show` when an overlay did not fit the shared memory pool, instead of reporting an
   error.
 - Leaking the shared memory file descriptor when preparing the overlay buffer failed.
+- `top-of`/`bottom-of` leaking the target output's width into its x coordinate.
 
 ## [v1.3.2]
 ### Fixed
