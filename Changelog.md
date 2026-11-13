@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [v1.3.3]
 ### Added
 - Publishing the `wltile` AUR package automatically from CI on `vX.Y.Z` tags.
 
@@ -14,7 +16,7 @@
 ### Fixed
 - panicing when passing the reference head by make name
 
-## Changed
+### Changed
 - Publishing wltile-core and wltile separately
 
 ## [v1.3.1]
@@ -111,7 +113,8 @@
 - position two displays relative to each other either left or right.
 - while positioning the displays, align them to bottom or top.
 
-[unreleased]: https://github.com/kdehairy/wltile/compare/v1.3.1...main
+[unreleased]: https://github.com/kdehairy/wltile/compare/v1.3.3...main
+[v1.3.3]: https://github.com/kdehairy/wltile/compare/v1.3.2...v1.3.3
 [v1.3.2]: https://github.com/kdehairy/wltile/compare/v1.3.1...v1.3.2
 [v1.3.1]: https://github.com/kdehairy/wltile/compare/v1.3.0...v1.3.1
 [v1.3.0]: https://github.com/kdehairy/wltile/compare/v1.2.1...v1.3.0
