@@ -358,8 +358,7 @@ impl Display for LayoutGraph {
             let mut edges: Vec<&Edge<String>> = self
                 .graph
                 .get(&node.name)
-                .map(|edges| edges.iter().collect())
-                .unwrap_or_default();
+                .map_or_default(|edges| edges.iter().collect());
             edges.sort_by(|a, b| {
                 (&a.target, a.relation.to_string(), a.alignment.to_string()).cmp(&(
                     &b.target,
