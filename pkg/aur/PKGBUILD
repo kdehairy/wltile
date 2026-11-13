@@ -1,0 +1,46 @@
+# Maintainer: Khaled Eldoheiri <khaled@eldoheiri.com>
+#
+# Source of truth for https://aur.archlinux.org/packages/wltile.
+# The `aur` CI job rewrites `pkgver`/`pkgrel` from the `vX.Y.Z` tag and regenerates
+# `sha256sums` and `.SRCINFO` before pushing; edit everything else here.
+pkgname=wltile
+pkgver=1.3.2
+pkgrel=1
+pkgdesc="A CLI tool that manages outputs/displays for wlroots based compositors"
+url="https://github.com/kdehairy/wltile"
+arch=('x86_64' 'aarch64')
+license=('GPL-3.0-or-later')
+depends=('gcc-libs' 'glibc')
+makedepends=('cargo')
+source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/v${pkgver}.tar.gz")
+sha256sums=('319950eb97e9f24cb9fc09f2731e290fab26b7cd0b0863419393da98c4a36644')
+
+prepare() {
+	export RUSTUP_TOOLCHAIN=stable
+
+	cd "${srcdir}/${pkgname}-${pkgver}"
+	cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+	export RUSTUP_TOOLCHAIN=stable
+	export CARGO_TARGET_DIR=target
+
+	cd "${srcdir}/${pkgname}-${pkgver}"
+	cargo build --frozen --release -p wltile
+}
+
+check() {
+	export RUSTUP_TOOLCHAIN=stable
+	export CARGO_TARGET_DIR=target
+
+	cd "${srcdir}/${pkgname}-${pkgver}"
+	# Unit tests only: the `integration` target needs a headless sway.
+	cargo test --frozen --release --workspace --lib --bins
+}
+
+package() {
+	cd "${srcdir}/${pkgname}-${pkgver}"
+	install -Dm0755 -t "${pkgdir}/usr/bin" "target/release/${pkgname}"
+	install -Dm0644 -t "${pkgdir}/usr/share/doc/${pkgname}" README.md Changelog.md
+}
