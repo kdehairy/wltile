@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Publishing the `wltile` AUR package automatically from CI on `vX.Y.Z` tags.
+
 ### Fixed
 - Crashing in `show` when an overlay did not fit the shared memory pool, instead of reporting an
   error.
