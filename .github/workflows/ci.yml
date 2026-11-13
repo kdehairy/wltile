@@ -96,7 +96,7 @@ jobs:
             -e "s/^pkgver=.*/pkgver=${GITHUB_REF_NAME#v}/" \
             -e "s/^pkgrel=.*/pkgrel=1/" \
             pkg/aur/PKGBUILD
-      - uses: KSXGitHub/github-actions-deploy-aur@v4
+      - uses: KSXGitHub/github-actions-deploy-aur@v4.2.0
         with:
           pkgname: wltile
           pkgbuild: pkg/aur/PKGBUILD
