@@ -270,9 +270,10 @@ impl LayoutGraph {
                             node.position.1.saturating_add(node.height),
                         ),
                     };
-                    // Step 2: the alignment fixes the other axis. Nothing checks
-                    // that it is perpendicular to the relation (see `Alignment`);
-                    // a parallel one overwrites the coordinate set in step 1.
+                    // Step 2: the alignment fixes the other axis. A `Position`
+                    // always pairs a relation with a perpendicular alignment
+                    // (`Position::new` rejects the rest), so this never
+                    // overwrites what the relation set.
                     let position = match edge.alignment {
                         Alignment::AlignBottom => {
                             let delta = node.height.saturating_sub(child.height);
@@ -595,10 +596,12 @@ LayoutGraph {
         assert_eq!(Point(100, 100), applied.get_node("1").unwrap().position);
     }
 
-    /// An alignment on the same axis as the relation overwrites the coordinate
-    /// the relation just set (the CLI rejects those pairs, the config file does
-    /// not yet), so the coordinate left in place is the one from the relation
-    /// step: the child's current one, never its width or height.
+    /// `Position::new` stops a relation and an alignment on the same axis from
+    /// ever existing, but `LayoutGraph` takes the two separately, so a graph
+    /// built by hand can still be handed that pair. The alignment then
+    /// overwrites the coordinate the relation just set, and what is left in
+    /// place is the child's current coordinate — never its width or height.
+    /// Pinned down so the solver stays predictable for a hand-wired `Edge`.
     #[test]
     fn test_apply_parallel_alignment_keeps_child_coordinate() {
         // reference "1": (100, 100) 200x200, child "2": (700, 900) 120x60.

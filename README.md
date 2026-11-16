@@ -112,14 +112,25 @@ to the lowest. This makes the ordinals stable between runs.
 wltile position <TARGET_OUTPUT> <RELATION> <REFERENCE_OUTPUT> [ALIGNMENT]
 
 Arguments:
-  <TARGET_OUTPUT>     Output to be positioned
+  <TARGET_OUTPUT>     Could be a serial number, name or partial match with the screen make
   <RELATION>          How is it positioned to the reference output [possible values: left-of, right-of, top-of, bottom-of]
-  <REFERENCE_OUTPUT>  Reference Output
-  [ALIGNMENT]         Alignment [default: align-bottom] [possible values: align-bottom, align-top, align-right, align-left]
+  <REFERENCE_OUTPUT>  Could be a serial number, name or partial match with the screen make
+  [ALIGNMENT]         Alignment. Defaults to `align-bottom` with `left-of`/`right-of` and to `align-left` with `top-of`/`bottom-of` [possible values: align-bottom, align-top, align-right, align-left]
 
 Options:
   -h, --help  Print help
 ```
+
+The relation fixes one axis and the alignment lines the two outputs up along the
+other, so the pair has to straddle both:
+
+| Relation | Alignment |
+| --- | --- |
+| `left-of`, `right-of` | `align-top` or `align-bottom` (default) |
+| `top-of`, `bottom-of` | `align-left` (default) or `align-right` |
+
+Any other combination places the outputs on top of each other, and is rejected —
+from `wltile position` and from the daemon's config file alike.
 
 Example:
 
@@ -207,6 +218,12 @@ mode = <value> #optional
 rotation = <value> #optional
 position = "<relation> <reference_output> <alignment>" #optinal
 ```
+
+`<relation>` and `<alignment>` have to act on different axes, exactly as in
+[`wltile position`](#position). A section that pairs them otherwise (`position =
+"top-of eDP-1 align-top"`) gets the whole file refused: the daemon logs the offending
+section and skips that reload, applying nothing. Unlike the command line, the config file
+has no default alignment: all three tokens are required.
 
 Example config file:
 ```toml

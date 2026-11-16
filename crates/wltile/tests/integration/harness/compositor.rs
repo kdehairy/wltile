@@ -149,8 +149,8 @@ impl Compositor {
     /// Spawns `wltile daemon --systemd` against this compositor, returning a handle
     /// used to signal and observe it.
     pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
-        let log =
-            File::create(self.runtime_dir.join("daemon.log")).expect("failed to create daemon log");
+        let log_path = self.runtime_dir.join("daemon.log");
+        let log = File::create(&log_path).expect("failed to create daemon log");
         let child = self
             .wltile_command()
             .args([
@@ -167,7 +167,7 @@ impl Compositor {
             .spawn()
             .expect("failed to spawn wltile daemon");
 
-        Daemon::new(child)
+        Daemon::new(child, log_path)
     }
 
     /// A `Command` for the `wltile` binary, pointed at this compositor instance.

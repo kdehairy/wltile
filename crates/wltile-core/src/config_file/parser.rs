@@ -31,8 +31,10 @@ impl FromStr for Config {
     ///
     /// # Errors
     ///
-    /// Returns an error if a `position` value is not a valid
-    /// [`Position`] (`"<relation> <reference> <alignment>"`).
+    /// Returns an error if a `position` value is not a valid [`Position`]
+    /// (`"<relation> <reference> <alignment>"`, with the relation and the
+    /// alignment on different axes). The message names the section it came
+    /// from, e.g. `[dell]: …`.
     ///
     /// # Panics
     ///
@@ -51,7 +53,9 @@ impl FromStr for Config {
         for target in config_table {
             let t = target.1.try_into::<T>().unwrap();
             let position = match t.position {
-                Some(position) => Some(Position::try_from(position)?),
+                Some(position) => Some(
+                    Position::try_from(position).map_err(|err| format!("[{}]: {err}", target.0))?,
+                ),
                 None => None,
             };
             let t = Target {
@@ -104,11 +108,68 @@ mod tests {
         let t = config.targets().first().unwrap();
         assert_eq!("DP-2", t.name);
         assert!(t.scale.unwrap().eq(&1f64));
-        assert_eq!(Relation::LeftOf, t.position.as_ref().unwrap().relation);
-        assert_eq!("eDP-1", t.position.as_ref().unwrap().reference);
-        assert_eq!(
-            Alignment::AlignBottom,
-            t.position.as_ref().unwrap().alignment
-        );
+        let position = t.position.as_ref().unwrap();
+        assert_eq!(Relation::LeftOf, position.relation());
+        assert_eq!("eDP-1", position.reference());
+        assert_eq!(Alignment::AlignBottom, position.alignment());
+    }
+
+    #[test]
+    fn accepts_every_valid_position_pairing() {
+        let config: Config = r#"
+[a]
+position = "left-of eDP-1 align-top"
+
+[b]
+position = "right-of eDP-1 align-bottom"
+
+[c]
+position = "top-of eDP-1 align-left"
+
+[d]
+position = "bottom-of eDP-1 align-right"
+"#
+        .parse()
+        .expect("every relation with a perpendicular alignment is valid");
+
+        assert_eq!(4, config.targets().len());
+        for (name, relation, alignment) in [
+            ("a", Relation::LeftOf, Alignment::AlignTop),
+            ("b", Relation::RightOf, Alignment::AlignBottom),
+            ("c", Relation::TopOf, Alignment::AlignLeft),
+            ("d", Relation::BottomOf, Alignment::AlignRight),
+        ] {
+            let target = config
+                .targets()
+                .iter()
+                .find(|t| t.name == name)
+                .unwrap_or_else(|| panic!("target [{name}] missing"));
+            let position = target.position.as_ref().expect("target has a position");
+            assert_eq!(relation, position.relation(), "[{name}] relation");
+            assert_eq!(alignment, position.alignment(), "[{name}] alignment");
+        }
+    }
+
+    #[test]
+    fn rejects_a_position_whose_relation_and_alignment_share_an_axis() {
+        // The CLI rejects these four pairs; the config file has to as well,
+        // otherwise the daemon applies a layout where the outputs overlap.
+        for position in [
+            "top-of eDP-1 align-top",
+            "top-of eDP-1 align-bottom",
+            "bottom-of eDP-1 align-top",
+            "bottom-of eDP-1 align-bottom",
+            "left-of eDP-1 align-left",
+            "left-of eDP-1 align-right",
+            "right-of eDP-1 align-left",
+            "right-of eDP-1 align-right",
+        ] {
+            let contents = format!("[dell]\nposition = \"{position}\"\n");
+            let err = contents
+                .parse::<Config>()
+                .expect_err(&format!("`{position}` should be rejected"));
+            assert!(err.starts_with("[dell]"), "{err} should name the section");
+            assert!(err.contains("axis"), "{err} should name the axis");
+        }
     }
 }
