@@ -31,8 +31,10 @@ use crate::{
 ///
 /// # Panics
 ///
-/// Panics if the compositor cannot be reached at startup. A config file that is
-/// unreadable or malformed panics the reload thread rather than the caller.
+/// Panics if the compositor cannot be reached at startup. Config file problems
+/// the parser reports — an unknown or same-axis `position` value — are logged
+/// and that reload is skipped. The parser still panics the reload thread on
+/// invalid TOML or a property of the wrong type.
 #[allow(clippy::needless_pass_by_value)]
 pub fn daemon_main(config_file: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     info!("daemon started");
@@ -103,16 +105,25 @@ pub fn daemon_main(config_file: PathBuf) -> Result<(), Box<dyn std::error::Error
 
 fn reload_configs(config_file: &Path, client: &Client) {
     trace!("Config file reloading...");
+    let config = match Config::try_from(config_file) {
+        Ok(config) => config,
+        Err(err) => {
+            error!(
+                "failed to load config file {}; skipping this reload: {err}",
+                config_file.display()
+            );
+            return;
+        }
+    };
     let mut filtered_config = Config::default();
     {
-        let config = Config::try_from(config_file).unwrap();
         let cur_configs = client.configurations_read_lock();
         let heads = cur_configs.read().heads().unwrap();
         drop(cur_configs);
         for target in config.targets() {
             if heads.find(&target.name).is_some() {
                 if let Some(pos) = target.position.as_ref()
-                    && heads.find(&pos.reference).is_some()
+                    && heads.find(pos.reference()).is_some()
                 {
                     filtered_config.add_target(target.clone());
                 }

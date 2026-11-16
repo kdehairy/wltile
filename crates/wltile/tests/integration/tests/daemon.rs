@@ -391,3 +391,63 @@ fn daemon_second_start_fails_when_pid_file_exists() {
         "expected the error to mention the pre-existing pid file, got stderr:\n{stderr}",
     );
 }
+
+/// A `position` whose relation and alignment share an axis is rejected, and the
+/// config file with it. That rejection used to be unwrapped, which killed the
+/// reload thread: the daemon kept running but never applied a config again.
+/// Applying a corrected file after the rejection is what pins the difference
+/// down.
+#[test]
+fn daemon_survives_a_rejected_position_and_applies_the_next_config() {
+    let mut comp = Compositor::new();
+    let h1 = comp.add_output();
+    let h2 = comp.add_output();
+
+    let config_path = comp.write_config(&format!(
+        r#"
+[{h1}]
+scale = 2
+
+[{h2}]
+position = "top-of {h1} align-top"
+"#,
+    ));
+    let mut daemon = comp.spawn_daemon(&config_path);
+
+    let rejected = daemon.wait_for_log(RELOAD_TIMEOUT, |log| {
+        log.contains("skipping this reload")
+            && log.contains(&format!("[{h2}]"))
+            && log.contains("vertical")
+    });
+    assert!(
+        rejected,
+        "expected the daemon to log that it refused the config file, naming the section and the \
+         axis, log:\n{}",
+        daemon.log(),
+    );
+
+    // Correct the file and reload. Only a reload thread that survived the
+    // rejection above gets this far.
+    comp.write_config(&format!(
+        r"
+[{h1}]
+scale = 2
+",
+    ));
+    let applied = comp.reload_until(&daemon, RELOAD_TIMEOUT, |outputs| {
+        let h1 = find_output(outputs, &h1);
+        (h1.scale - 2.0).abs() < 0.01
+    });
+    assert!(
+        applied,
+        "expected the daemon to apply the corrected config after SIGHUP, final outputs: {:?}, \
+         log:\n{}",
+        comp.outputs(),
+        daemon.log(),
+    );
+    assert!(
+        daemon.is_alive(),
+        "expected the daemon to still be running, log:\n{}",
+        daemon.log(),
+    );
+}

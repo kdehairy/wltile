@@ -57,11 +57,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut config = Config::default();
     config.add_target(Target {
-        position: Some(Position {
-            relation: Relation::LeftOf,
-            reference: "eDP-1".into(),
-            alignment: Alignment::AlignBottom,
-        }),
+        position: Some(Position::new(
+            Relation::LeftOf,
+            "eDP-1".into(),
+            Alignment::AlignBottom,
+        )?),
         ..Target::new("dell".into())
     });
 
@@ -69,6 +69,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+`Position::new` is the only way to build a position, and it rejects a relation and an
+alignment that act on the same axis (`top-of` with `align-top`, `left-of` with
+`align-right`): the alignment would overwrite the coordinate the relation just set and
+the outputs would overlap. A `Position` you hold is therefore one that can be applied;
+read it back with `relation()`, `reference()` and `alignment()`, or build it from the
+same `"<relation> <reference> <alignment>"` string the daemon's config file uses.
 
 `position` keeps the whole layout anchored at the origin, shifting outputs that aren't part of
 the config by the same offset.

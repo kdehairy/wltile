@@ -50,9 +50,13 @@ pub enum Commands {
         )]
         reference: String,
 
-        /// Alignment
-        #[arg(value_name="ALIGNMENT", default_value_t= Alignment::AlignBottom)]
-        alignment: Alignment,
+        /// Alignment. Defaults to `align-bottom` with `left-of`/`right-of` and
+        /// to `align-left` with `top-of`/`bottom-of`.
+        #[arg(
+            value_name = "ALIGNMENT",
+            help = "Defaults to `align-bottom` with `left-of`/`right-of` and to `align-left` with `top-of`/`bottom-of` [possible values: align-bottom, align-top, align-right, align-left]"
+        )]
+        alignment: Option<Alignment>,
     },
     #[command(
         about = "Sets properties of the output to a desired value",
@@ -226,35 +230,47 @@ pub(crate) fn target_from_set(
     Ok(target)
 }
 
-pub(crate) fn validate(args: &Cli) -> Result<(), String> {
-    match &args.command {
-        Commands::Position {
-            relation,
-            alignment,
-            ..
-        } => match (relation, alignment) {
-            (Relation::LeftOf | Relation::RightOf, Alignment::AlignRight) => Err(String::from(
-                "Impossible to align right on a horizontal setup",
-            )),
-            (Relation::RightOf | Relation::LeftOf, Alignment::AlignLeft) => Err(String::from(
-                "Impossible to align left on a horizontal setup",
-            )),
-            (Relation::TopOf | Relation::BottomOf, Alignment::AlignBottom) => Err(String::from(
-                "Impossible to align bottom on a vertical setup",
-            )),
-            (Relation::TopOf | Relation::BottomOf, Alignment::AlignTop) => {
-                Err(String::from("Impossible to align top on a vertical setup"))
+/// Builds the [`wl_config::Position`] a `position` command asks for.
+///
+/// A missing `ALIGNMENT` defaults to the one that keeps the layout reading
+/// top-to-bottom, left-to-right: [`Alignment::AlignBottom`] with
+/// `left-of`/`right-of`, [`Alignment::AlignLeft`] with `top-of`/`bottom-of`.
+/// Both are perpendicular to their relation, as an alignment has to be — the
+/// compatibility rule itself lives in `wltile-core`, so the daemon's config
+/// file reports the same error from the same place.
+///
+/// # Errors
+///
+/// Returns an error if the given relation and alignment act on the same axis;
+/// the message names the alignments that would work.
+pub(crate) fn position_from_args(
+    relation: Relation,
+    reference: String,
+    alignment: Option<Alignment>,
+) -> Result<wl_config::Position, String> {
+    let relation = wl_config::Relation::from(relation);
+    let alignment = match alignment {
+        Some(alignment) => wl_config::Alignment::from(alignment),
+        None => match relation {
+            wl_config::Relation::LeftOf | wl_config::Relation::RightOf => {
+                wl_config::Alignment::AlignBottom
             }
-            _ => Ok(()),
+            wl_config::Relation::TopOf | wl_config::Relation::BottomOf => {
+                wl_config::Alignment::AlignLeft
+            }
         },
-        _ => Ok(()),
-    }
+    };
+
+    wl_config::Position::new(relation, reference, alignment)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Alignment, Cli, Commands, Property, Relation, target_from_set, validate};
+    use super::{
+        Alignment, Cli, Commands, Property, Relation, position_from_args, target_from_set,
+    };
     use clap::{CommandFactory, Parser};
+    use wltile_core::wl_config;
 
     fn parse(args: &[&str]) -> Cli {
         Cli::try_parse_from(args).expect("args should parse")
@@ -265,64 +281,79 @@ mod tests {
         Cli::command().debug_assert();
     }
 
-    // --- validate(): the relation x alignment compatibility matrix ---
+    // --- position_from_args(): the default alignment, plus core's matrix ---
 
     #[test]
-    fn validate_rejects_horizontal_relation_with_horizontal_alignment() {
-        for relation in ["left-of", "right-of"] {
-            for alignment in ["align-left", "align-right"] {
-                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
-                assert!(
-                    validate(&cli).is_err(),
-                    "{relation} + {alignment} should be rejected"
-                );
-            }
+    fn position_defaults_the_alignment_per_relation() {
+        // Every default is one the relation accepts: an alignment may not land
+        // on the axis the relation already fixed.
+        for (relation, expected) in [
+            (Relation::LeftOf, wl_config::Alignment::AlignBottom),
+            (Relation::RightOf, wl_config::Alignment::AlignBottom),
+            (Relation::TopOf, wl_config::Alignment::AlignLeft),
+            (Relation::BottomOf, wl_config::Alignment::AlignLeft),
+        ] {
+            let position =
+                position_from_args(relation, String::from("B"), None).unwrap_or_else(|err| {
+                    panic!("{relation} without an alignment should get the default: {err}")
+                });
+            assert_eq!(wl_config::Relation::from(relation), position.relation());
+            assert_eq!("B", position.reference());
+            assert_eq!(expected, position.alignment(), "{relation} default");
+
+            let (first, second) = wl_config::Relation::from(relation).compatible_alignments();
+            assert!(
+                expected == first || expected == second,
+                "{relation} defaults to {expected}, which it does not accept"
+            );
         }
     }
 
     #[test]
-    fn validate_rejects_vertical_relation_with_vertical_alignment() {
-        for relation in ["top-of", "bottom-of"] {
-            for alignment in ["align-top", "align-bottom"] {
-                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
-                assert!(
-                    validate(&cli).is_err(),
-                    "{relation} + {alignment} should be rejected"
-                );
-            }
+    fn position_rejects_relation_and_alignment_on_the_same_axis() {
+        for (relation, alignment) in [
+            (Relation::LeftOf, Alignment::AlignLeft),
+            (Relation::LeftOf, Alignment::AlignRight),
+            (Relation::RightOf, Alignment::AlignLeft),
+            (Relation::RightOf, Alignment::AlignRight),
+            (Relation::TopOf, Alignment::AlignTop),
+            (Relation::TopOf, Alignment::AlignBottom),
+            (Relation::BottomOf, Alignment::AlignTop),
+            (Relation::BottomOf, Alignment::AlignBottom),
+        ] {
+            let (relation_name, alignment_name) = (relation.to_string(), alignment.to_string());
+            let err = position_from_args(relation, String::from("B"), Some(alignment)).expect_err(
+                &format!(
+                    "{relation_name} + {alignment_name} act on the same axis and should be rejected"
+                ),
+            );
+            assert!(
+                err.contains(&relation_name)
+                    && err.contains(&alignment_name)
+                    && err.contains("axis"),
+                "{relation_name} + {alignment_name}: {err} should name the pair and its axis"
+            );
         }
     }
 
     #[test]
-    fn validate_accepts_horizontal_relation_with_vertical_alignment() {
-        for relation in ["left-of", "right-of"] {
-            for alignment in ["align-top", "align-bottom"] {
-                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
-                assert!(
-                    validate(&cli).is_ok(),
-                    "{relation} + {alignment} should be accepted"
-                );
-            }
+    fn position_accepts_perpendicular_pairs_and_maps_the_fields() {
+        for (relation, alignment) in [
+            (Relation::LeftOf, Alignment::AlignTop),
+            (Relation::LeftOf, Alignment::AlignBottom),
+            (Relation::RightOf, Alignment::AlignTop),
+            (Relation::RightOf, Alignment::AlignBottom),
+            (Relation::TopOf, Alignment::AlignLeft),
+            (Relation::TopOf, Alignment::AlignRight),
+            (Relation::BottomOf, Alignment::AlignLeft),
+            (Relation::BottomOf, Alignment::AlignRight),
+        ] {
+            let position = position_from_args(relation, String::from("B"), Some(alignment))
+                .unwrap_or_else(|err| panic!("{relation} + {alignment} should be accepted: {err}"));
+            assert_eq!(wl_config::Relation::from(relation), position.relation());
+            assert_eq!(wl_config::Alignment::from(alignment), position.alignment());
+            assert_eq!("B", position.reference());
         }
-    }
-
-    #[test]
-    fn validate_accepts_vertical_relation_with_horizontal_alignment() {
-        for relation in ["top-of", "bottom-of"] {
-            for alignment in ["align-left", "align-right"] {
-                let cli = parse(&["wltile", "position", "A", relation, "B", alignment]);
-                assert!(
-                    validate(&cli).is_ok(),
-                    "{relation} + {alignment} should be accepted"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn validate_ignores_non_position_commands() {
-        assert!(validate(&parse(&["wltile", "list"])).is_ok());
-        assert!(validate(&parse(&["wltile", "show"])).is_ok());
     }
 
     // --- parsing round-trips ---
@@ -349,11 +380,11 @@ mod tests {
     }
 
     #[test]
-    fn position_defaults_alignment_to_align_bottom() {
+    fn position_leaves_the_alignment_unset_when_omitted() {
+        // The default is decided by `position_from_args`, per relation: clap
+        // must not hand it a value that only fits the horizontal ones.
         match parse(&["wltile", "position", "A", "right-of", "B"]).command {
-            Commands::Position { alignment, .. } => {
-                assert_eq!(alignment, Alignment::AlignBottom);
-            }
+            Commands::Position { alignment, .. } => assert!(alignment.is_none()),
             _ => panic!("expected the Position command"),
         }
     }
@@ -370,7 +401,7 @@ mod tests {
                 assert_eq!(target, "A");
                 assert_eq!(relation, Relation::TopOf);
                 assert_eq!(reference, "B");
-                assert_eq!(alignment, Alignment::AlignLeft);
+                assert_eq!(Some(Alignment::AlignLeft), alignment);
             }
             _ => panic!("expected the Position command"),
         }

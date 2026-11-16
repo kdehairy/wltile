@@ -1,5 +1,7 @@
 //! Handle for a `wltile daemon` child process: signalling it and observing its exit.
 
+use std::fs;
+use std::path::PathBuf;
 use std::process::{Child, ExitStatus};
 use std::time::Duration;
 
@@ -15,13 +17,16 @@ const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 pub struct Daemon {
     child: Child,
     pid: u32,
+    /// Where `spawn_daemon` redirected the daemon's stdout and stderr.
+    log_path: PathBuf,
 }
 
 impl Daemon {
-    pub(super) fn new(child: Child) -> Self {
+    pub(super) fn new(child: Child, log_path: PathBuf) -> Self {
         Self {
             pid: child.id(),
             child,
+            log_path,
         }
     }
 
@@ -43,6 +48,21 @@ impl Daemon {
     /// Whether the process is still running.
     pub fn is_alive(&mut self) -> bool {
         matches!(self.child.try_wait(), Ok(None))
+    }
+
+    /// Everything the daemon has written to its log so far.
+    pub fn log(&self) -> String {
+        fs::read_to_string(&self.log_path).unwrap_or_default()
+    }
+
+    /// Polls the daemon's log until `predicate` accepts it, reporting whether
+    /// that happened before `timeout` elapsed.
+    ///
+    /// Lets a test observe something the daemon only *reports* — a config file
+    /// it refused to load — as the positive control for "the reload actually
+    /// ran and handled it", rather than inferring it from an absence of change.
+    pub fn wait_for_log(&self, timeout: Duration, predicate: impl Fn(&str) -> bool) -> bool {
+        poll_until(timeout, || predicate(&self.log()).then_some(())).is_some()
     }
 
     fn signal(&self, sig: libc::c_int) {

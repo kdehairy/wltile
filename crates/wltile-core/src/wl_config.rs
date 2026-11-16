@@ -6,6 +6,27 @@
 
 use std::fmt::Display;
 
+/// The axis a [`Relation`] places along, or an [`Alignment`] lines edges up on.
+///
+/// A relation and an alignment are only usable together when they act on
+/// different axes: the relation fixes one coordinate of the target, the
+/// alignment the other.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Axis {
+    Horizontal,
+    Vertical,
+}
+
+impl Axis {
+    /// The axis name, as used in error messages.
+    fn name(self) -> &'static str {
+        match self {
+            Self::Horizontal => "horizontal",
+            Self::Vertical => "vertical",
+        }
+    }
+}
+
 #[allow(clippy::enum_variant_names)]
 /// Where a target output sits relative to its reference output.
 ///
@@ -37,6 +58,28 @@ impl TryFrom<&str> for Relation {
     }
 }
 
+impl Relation {
+    /// The axis this relation places the target along.
+    fn axis(self) -> Axis {
+        match self {
+            Self::LeftOf | Self::RightOf => Axis::Horizontal,
+            Self::TopOf | Self::BottomOf => Axis::Vertical,
+        }
+    }
+
+    /// The alignments usable with this relation: the ones acting on the axis
+    /// the relation leaves free.
+    ///
+    /// [`Position::new`] rejects every other pairing.
+    #[must_use]
+    pub fn compatible_alignments(self) -> (Alignment, Alignment) {
+        match self {
+            Self::LeftOf | Self::RightOf => (Alignment::AlignTop, Alignment::AlignBottom),
+            Self::TopOf | Self::BottomOf => (Alignment::AlignLeft, Alignment::AlignRight),
+        }
+    }
+}
+
 impl Display for Relation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -54,7 +97,9 @@ impl Display for Relation {
 /// Use [`AlignTop`](Self::AlignTop) or [`AlignBottom`](Self::AlignBottom)
 /// with [`Relation::LeftOf`] and [`Relation::RightOf`], and
 /// [`AlignLeft`](Self::AlignLeft) or [`AlignRight`](Self::AlignRight) with
-/// [`Relation::TopOf`] and [`Relation::BottomOf`].
+/// [`Relation::TopOf`] and [`Relation::BottomOf`] — see
+/// [`Relation::compatible_alignments`]. [`Position::new`] rejects every other
+/// pairing.
 ///
 /// Parses from and displays as `align-bottom`, `align-top`, `align-right`
 /// and `align-left`.
@@ -84,6 +129,16 @@ impl TryFrom<&str> for Alignment {
     }
 }
 
+impl Alignment {
+    /// The axis this alignment lines the two outputs' edges up on.
+    fn axis(self) -> Axis {
+        match self {
+            Self::AlignLeft | Self::AlignRight => Axis::Horizontal,
+            Self::AlignTop | Self::AlignBottom => Axis::Vertical,
+        }
+    }
+}
+
 impl Display for Alignment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -97,16 +152,73 @@ impl Display for Alignment {
 
 /// Where to place an output, relative to another one.
 ///
-/// Parses from a string of the form `"<relation> <reference> <alignment>"`,
+/// The relation fixes one axis and the alignment lines the two outputs up
+/// along the other, so they have to act on different axes: `left-of`/`right-of`
+/// take `align-top`/`align-bottom`, `top-of`/`bottom-of` take
+/// `align-left`/`align-right` ([`Relation::compatible_alignments`]).
+///
+/// [`new`](Self::new) is the only constructor and rejects every other pairing,
+/// so a `Position` that exists is a position that can be applied: nothing
+/// downstream needs to check it again.
+///
+/// Parses from a string of the same shape,
 /// e.g. `"left-of eDP-1 align-bottom"`, and displays the same way.
 #[derive(Debug, Clone)]
 pub struct Position {
-    /// Which side of the reference output to place the target on.
-    pub relation: Relation,
-    /// The output to position against, matched like [`Heads::find`](crate::Heads::find).
-    pub reference: String,
+    relation: Relation,
+    reference: String,
+    alignment: Alignment,
+}
+
+impl Position {
+    /// Creates a position from a relation, the output to position against and
+    /// an alignment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `relation` and `alignment` act on the same axis:
+    /// the alignment would overwrite the coordinate the relation had set and
+    /// the two outputs would overlap. The message names the axis and the
+    /// alignments that do work, e.g. `` `top-of` and `align-top` both act on
+    /// the vertical axis; use `align-left` or `align-right` ``.
+    pub fn new(
+        relation: Relation,
+        reference: String,
+        alignment: Alignment,
+    ) -> Result<Self, String> {
+        if alignment.axis() == relation.axis() {
+            let (first, second) = relation.compatible_alignments();
+            let axis = relation.axis().name();
+            return Err(format!(
+                "`{relation}` and `{alignment}` both act on the {axis} axis; use `{first}` or `{second}`"
+            ));
+        }
+
+        Ok(Self {
+            relation,
+            reference,
+            alignment,
+        })
+    }
+
+    /// Which side of the reference output the target is placed on.
+    #[must_use]
+    pub fn relation(&self) -> Relation {
+        self.relation
+    }
+
+    /// The output this one is positioned against, matched like
+    /// [`Heads::find`](crate::Heads::find).
+    #[must_use]
+    pub fn reference(&self) -> &str {
+        &self.reference
+    }
+
     /// Which edges of the two outputs line up.
-    pub alignment: Alignment,
+    #[must_use]
+    pub fn alignment(&self) -> Alignment {
+        self.alignment
+    }
 }
 
 impl TryFrom<String> for Position {
@@ -129,11 +241,7 @@ impl TryFrom<String> for Position {
             None => return Err(String::from("Missing alignment")),
         };
 
-        Ok(Position {
-            relation,
-            reference,
-            alignment,
-        })
+        Position::new(relation, reference, alignment)
     }
 }
 
@@ -227,5 +335,185 @@ impl Display for Config {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Alignment, Axis, Position, Relation};
+
+    const RELATIONS: [Relation; 4] = [
+        Relation::LeftOf,
+        Relation::RightOf,
+        Relation::TopOf,
+        Relation::BottomOf,
+    ];
+
+    const ALIGNMENTS: [Alignment; 4] = [
+        Alignment::AlignBottom,
+        Alignment::AlignTop,
+        Alignment::AlignRight,
+        Alignment::AlignLeft,
+    ];
+
+    /// Both alignments a relation accepts, as something a loop or `contains`
+    /// can work with.
+    fn compatible(relation: Relation) -> [Alignment; 2] {
+        let (first, second) = relation.compatible_alignments();
+        [first, second]
+    }
+
+    /// The axis each variant acts on: relations place along one, alignments
+    /// line edges up along the other, and `Position::new` requires the two to
+    /// differ.
+    #[test]
+    fn relations_and_alignments_split_across_the_axes() {
+        for relation in RELATIONS {
+            let expected = match relation {
+                Relation::LeftOf | Relation::RightOf => Axis::Horizontal,
+                Relation::TopOf | Relation::BottomOf => Axis::Vertical,
+            };
+            assert_eq!(expected, relation.axis(), "{relation}");
+        }
+        for alignment in ALIGNMENTS {
+            let expected = match alignment {
+                Alignment::AlignLeft | Alignment::AlignRight => Axis::Horizontal,
+                Alignment::AlignTop | Alignment::AlignBottom => Axis::Vertical,
+            };
+            assert_eq!(expected, alignment.axis(), "{alignment}");
+        }
+    }
+
+    /// The matrix, in one place: each relation's compatible alignments are the
+    /// ones on the other axis, two per relation, all four reachable.
+    #[test]
+    fn compatible_alignments_are_the_perpendicular_ones() {
+        for relation in RELATIONS {
+            let (first, second) = relation.compatible_alignments();
+            assert_ne!(first, second, "{relation} has two distinct alignments");
+            for alignment in [first, second] {
+                assert_ne!(
+                    relation.axis(),
+                    alignment.axis(),
+                    "{relation} + {alignment} are on different axes"
+                );
+            }
+        }
+
+        assert_eq!(
+            (Alignment::AlignTop, Alignment::AlignBottom),
+            Relation::LeftOf.compatible_alignments()
+        );
+        assert_eq!(
+            (Alignment::AlignTop, Alignment::AlignBottom),
+            Relation::RightOf.compatible_alignments()
+        );
+        assert_eq!(
+            (Alignment::AlignLeft, Alignment::AlignRight),
+            Relation::TopOf.compatible_alignments()
+        );
+        assert_eq!(
+            (Alignment::AlignLeft, Alignment::AlignRight),
+            Relation::BottomOf.compatible_alignments()
+        );
+    }
+
+    #[test]
+    fn new_accepts_the_compatible_pairs() {
+        for relation in RELATIONS {
+            for alignment in compatible(relation) {
+                let position = Position::new(relation, String::from("eDP-1"), alignment)
+                    .unwrap_or_else(|err| panic!("{relation} + {alignment} should build: {err}"));
+                assert_eq!(relation, position.relation());
+                assert_eq!("eDP-1", position.reference());
+                assert_eq!(alignment, position.alignment());
+            }
+        }
+    }
+
+    #[test]
+    fn new_rejects_pairs_on_the_same_axis() {
+        for relation in RELATIONS {
+            for alignment in ALIGNMENTS {
+                let outcome = Position::new(relation, String::from("eDP-1"), alignment);
+                if compatible(relation).contains(&alignment) {
+                    assert!(
+                        outcome.is_ok(),
+                        "{relation} + {alignment} should be accepted"
+                    );
+                    continue;
+                }
+
+                let err =
+                    outcome.expect_err(&format!("{relation} + {alignment} should be rejected"));
+                assert!(
+                    err.contains(&relation.to_string()) && err.contains(&alignment.to_string()),
+                    "{relation} + {alignment}: {err} should name the pair"
+                );
+                assert!(
+                    err.contains(relation.axis().name()) && err.contains("axis"),
+                    "{relation} + {alignment}: {err} should name the axis"
+                );
+                for suggestion in compatible(relation) {
+                    assert!(
+                        err.contains(&suggestion.to_string()),
+                        "{relation} + {alignment}: {err} should suggest {suggestion}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The two ways of building a `Position` have to agree: the config file
+    /// parses strings, the CLI and library callers go through `new`.
+    #[test]
+    fn string_and_constructor_agree() {
+        for relation in RELATIONS {
+            for alignment in ALIGNMENTS {
+                let from_string = Position::try_from(format!("{relation} eDP-1 {alignment}"));
+                let from_new = Position::new(relation, String::from("eDP-1"), alignment);
+                match (from_string, from_new) {
+                    (Ok(parsed), Ok(built)) => {
+                        assert_eq!(built.relation(), parsed.relation());
+                        assert_eq!(built.reference(), parsed.reference());
+                        assert_eq!(built.alignment(), parsed.alignment());
+                    }
+                    (Err(parsed_err), Err(built_err)) => {
+                        assert_eq!(built_err, parsed_err, "{relation} + {alignment}");
+                    }
+                    (parsed, built) => panic!(
+                        "{relation} + {alignment} disagreed: parse {:?}, new {:?}",
+                        parsed.map(|p| p.to_string()),
+                        built.map(|p| p.to_string())
+                    ),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn parses_and_displays_the_three_tokens() {
+        let text = "right-of eDP-1 align-top";
+        let position = Position::try_from(String::from(text)).expect("valid position");
+
+        assert_eq!(Relation::RightOf, position.relation());
+        assert_eq!("eDP-1", position.reference());
+        assert_eq!(Alignment::AlignTop, position.alignment());
+        assert_eq!(text, position.to_string());
+    }
+
+    #[test]
+    fn reports_which_token_is_missing_or_unknown() {
+        for (value, expected) in [
+            ("", "Missing relation"),
+            ("left-of", "Missing reference"),
+            ("left-of eDP-1", "Missing alignment"),
+            ("bogus eDP-1 align-top", "Unknown relation 'bogus'"),
+            ("left-of eDP-1 bogus", "Unknown alignment 'bogus'"),
+        ] {
+            let err =
+                Position::try_from(String::from(value)).expect_err(&format!("{value:?} invalid"));
+            assert_eq!(expected, err, "{value:?}");
+        }
     }
 }

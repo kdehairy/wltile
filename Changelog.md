@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Changed
+- `wl_config::Position`'s fields are private, with `Position::new` as the only constructor: it
+  rejects a relation and an alignment on the same axis, so every `Position` that exists can be
+  applied. Read one back with `relation()`, `reference()` and `alignment()`. Breaking change for
+  library users, who previously built `Position` as a struct literal.
+- `wltile position` with `top-of`/`bottom-of` and no alignment now uses `align-left` instead of
+  failing with "Impossible to align bottom on a vertical setup" — a mismatch invented by the
+  `align-bottom` default nobody had typed. `left-of`/`right-of` keep defaulting to `align-bottom`.
+
+### Fixed
+- Config files accepted a position combining a relation and an alignment on the same axis
+  (`position = "top-of eDP-1 align-top"`), which laid the outputs on top of each other. The pair
+  is now rejected in `wltile-core`, so the daemon's config file and the CLI report the same error.
+- The daemon's reload thread panicking on a position string it rejected, after which no SIGHUP or
+  output change ever applied a config again. The failure is logged, naming the section, and that
+  reload is skipped.
+
 ## [v1.3.3]
 ### Added
 - Publishing the `wltile` AUR package automatically from CI on `vX.Y.Z` tags.

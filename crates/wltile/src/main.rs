@@ -10,7 +10,6 @@ use tracing::trace;
 
 use wltile_core::Client;
 use wltile_core::wl_config::Config;
-use wltile_core::wl_config::Position;
 use wltile_core::wl_config::Target;
 
 #[cfg(debug_assertions)]
@@ -22,7 +21,6 @@ const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::ERROR;
 #[tracing::instrument()]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
-    cli::validate(&args)?;
 
     let log_level = match args.verbose {
         0 => DEFAULT_LOG_LEVEL,
@@ -65,17 +63,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             reference,
             alignment,
         } => {
-            trace!("cli command: position {target} {relation} {reference} {alignment}");
+            // Built before connecting to the compositor: a relation and an
+            // alignment that don't go together is reported without one.
+            let position = cli::position_from_args(relation, reference, alignment)?;
+            trace!("cli command: position {target} {position}");
             let client = Client::new()?;
             let mut config = Config::default();
             config.add_target(Target {
-                name: target,
-                position: Some(Position {
-                    relation: relation.into(),
-                    reference,
-                    alignment: alignment.into(),
-                }),
-                ..Default::default()
+                position: Some(position),
+                ..Target::new(target)
             });
             wltile_core::position(&config, &client)?;
             Ok(())

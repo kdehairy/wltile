@@ -36,25 +36,24 @@ pub fn exec(config: &Config, client: &wlr_client::Client) -> Result<(), ClientEr
 
     let mut layout_graph = LayoutGraph::default();
     for target in config.targets() {
-        if target.position.is_none() {
+        // A `Position` always has a relation and an alignment on different
+        // axes: `Position::new` is the only way to build one.
+        let Some(position) = target.position.as_ref() else {
             continue;
-        }
-        let reference_name = &target.position.as_ref().unwrap().reference;
+        };
         let ref_head = heads
-            .find(reference_name)
+            .find(position.reference())
             .ok_or("reference output does not exist")?;
         layout_graph.ensure_node(Node::try_from(ref_head)?);
 
-        let relation = target.position.as_ref().unwrap().relation;
-        let alignment = target.position.as_ref().unwrap().alignment;
         let target_head = heads
             .find(&target.name)
             .ok_or("target output does not exist")?;
         layout_graph.add_edge_with_target(
             ref_head.name(),
             Node::try_from(target_head)?,
-            relation,
-            alignment,
+            position.relation(),
+            position.alignment(),
         );
     }
 
