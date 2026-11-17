@@ -4,6 +4,7 @@ mod process;
 mod startup;
 
 pub use compositor::Compositor;
+pub use compositor::Pending;
 // Returned by `Compositor::spawn_daemon` / `spawn_wltile`. Tests get them by
 // inference and so don't name them today, but the names must stay reachable
 // for any test helper that wants them in a signature.

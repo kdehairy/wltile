@@ -1,9 +1,16 @@
 //! A headless sway instance under its own `XDG_RUNTIME_DIR`, plus the operations
 //! tests drive it with: creating outputs, running `wltile` against it, and
 //! observing the resulting compositor state via sway's IPC.
+//!
+//! A test can also take the setup one step at a time. [`Pending::new`] creates
+//! the runtime dir and nothing else — no Wayland socket, so a `wltile` started
+//! there has no compositor to reach, which is the state a session's service
+//! manager leaves the daemon in — and [`Pending::start_sway`] brings sway up
+//! under it afterwards.
 
+use std::ffi::OsStr;
 use std::fs::{self, File};
-use std::os::unix::fs::DirBuilderExt;
+use std::os::unix::fs::{DirBuilderExt, symlink};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -22,23 +29,30 @@ const APPEAR_TIMEOUT: Duration = Duration::from_secs(5);
 const SWAYMSG_TIMEOUT: Duration = Duration::from_secs(15);
 const WLTILE_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub struct Compositor {
-    process: Child,
-    /// Unique per-instance directory used as `XDG_RUNTIME_DIR`.
-    /// Sway creates both its Wayland socket and IPC socket here.
+/// The `WAYLAND_DISPLAY` handed to processes started in a [`Pending`] runtime
+/// dir: a name only this harness uses, which [`Pending::start_sway`] symlinks to
+/// sway's own socket once there is one.
+///
+/// Sway calls its socket `wayland-<n>` for the first free `n`, and a test that
+/// starts `wltile` before sway cannot know which `n` that will be. A name the
+/// harness picks for itself takes the guessing out of it: the daemon looks its
+/// display up when it connects rather than once at startup, so the attempt after
+/// the symlink appears is the one that succeeds.
+const PINNED_DISPLAY: &str = "wayland-test";
+
+/// A runtime dir waiting for its compositor: no sockets in it yet, so anything
+/// started here has to wait for sway the way a daemon started at login does.
+pub struct Pending {
     runtime_dir: PathBuf,
-    sway_sock: PathBuf,
-    wayland_sock: PathBuf,
-    output_count: u32,
+    sway_log: PathBuf,
 }
 
-impl Compositor {
+impl Pending {
+    /// Creates the isolated runtime dir. Unique per instance, which is what keeps
+    /// tests running in parallel out of each other's sockets.
     pub fn new() -> Self {
         let n = INSTANCE_COUNTER.fetch_add(1, Ordering::SeqCst);
         let pid = std::process::id();
-
-        // Isolated dir per instance — guarantees no socket name collisions
-        // when tests run in parallel.
         let runtime_dir = PathBuf::from(format!("/tmp/wltile-test-{pid}-{n}"));
 
         // XDG spec requires mode 0700; wlroots refuses to create sockets otherwise.
@@ -47,8 +61,68 @@ impl Compositor {
             .create(&runtime_dir)
             .expect("failed to create runtime dir");
 
-        let sway_log = runtime_dir.join("sway.log");
+        Self {
+            sway_log: runtime_dir.join("sway.log"),
+            runtime_dir,
+        }
+    }
 
+    /// The isolated `XDG_RUNTIME_DIR` this instance runs under.
+    pub fn runtime_dir(&self) -> &Path {
+        &self.runtime_dir
+    }
+
+    /// Writes a TOML daemon config into this instance's runtime dir and returns
+    /// its path.
+    pub fn write_config(&self, contents: &str) -> PathBuf {
+        let path = self.runtime_dir.join("config.toml");
+        fs::write(&path, contents).expect("failed to write daemon config");
+        path
+    }
+
+    /// Spawns `wltile daemon --systemd` in this runtime dir against the pinned
+    /// display name — which has no socket behind it until
+    /// [`start_sway`](Self::start_sway), so what the daemon does in the meantime
+    /// is exactly what is under test.
+    pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
+        self.spawn_daemon_at(OsStr::new(PINNED_DISPLAY), config_path)
+    }
+
+    /// Spawns `wltile daemon --systemd` here, against `display`.
+    fn spawn_daemon_at(&self, display: &OsStr, config_path: &Path) -> Daemon {
+        let log_path = self.runtime_dir.join("daemon.log");
+        let log = File::create(&log_path).expect("failed to create daemon log");
+        let child = self
+            .command(display)
+            .args([
+                "-vvv",
+                "daemon",
+                // keeps the process in the foreground instead of forking, so it stays a controllable
+                // child here.
+                "--systemd",
+                "--config",
+                config_path.to_str().expect("config path must be utf-8"),
+            ])
+            .stdout(log.try_clone().expect("failed to clone daemon log"))
+            .stderr(log)
+            .spawn()
+            .expect("failed to spawn wltile daemon");
+
+        Daemon::new(child, log_path)
+    }
+
+    /// A `Command` for the `wltile` binary under test, pointed at this runtime
+    /// dir's Wayland display by name.
+    fn command(&self, display: &OsStr) -> Command {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_wltile"));
+        cmd.env("WAYLAND_DISPLAY", display)
+            .env("XDG_RUNTIME_DIR", &self.runtime_dir);
+        cmd
+    }
+
+    /// Starts sway in this runtime dir, waits for it to be usable, and hands the
+    /// pair over as a [`Compositor`].
+    pub fn start_sway(self) -> Compositor {
         let config = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
             .join("sway-test.conf");
@@ -57,28 +131,59 @@ impl Compositor {
             .env("WLR_BACKENDS", "headless")
             .env("WLR_RENDERER", "pixman")
             .env("LIBSEAT_BACKEND", "noop")
-            .env("XDG_RUNTIME_DIR", &runtime_dir)
+            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
             .arg("--unsupported-gpu")
             .arg("-c")
             .arg(&config)
             .stdout(Stdio::null())
-            .stderr(File::create(&sway_log).expect("failed to create sway log"))
+            .stderr(File::create(&self.sway_log).expect("failed to create sway log"))
             .spawn()
             .expect("failed to spawn sway — is it installed?");
 
         let sway_pid = process.id();
 
-        let wayland_sock = find_wayland_sock(&runtime_dir, &sway_log);
-        let sway_sock = find_sway_sock(&runtime_dir, sway_pid, &sway_log);
-        wait_for_sway_ready(&sway_sock, &runtime_dir, &sway_log);
+        let wayland_sock = find_wayland_sock(&self.runtime_dir, &self.sway_log);
+        let sway_sock = find_sway_sock(&self.runtime_dir, sway_pid, &self.sway_log);
+        wait_for_sway_ready(&sway_sock, &self.runtime_dir, &self.sway_log);
 
-        Self {
+        // Whatever was waiting on the pinned name connects on its next attempt:
+        // this is the moment a daemon with no compositor gains one.
+        symlink(&wayland_sock, self.runtime_dir.join(PINNED_DISPLAY))
+            .expect("failed to pin the Wayland display name to sway's socket");
+
+        Compositor {
+            pending: self,
             process,
-            runtime_dir,
             sway_sock,
             wayland_sock,
             output_count: 0,
         }
+    }
+}
+
+impl Drop for Pending {
+    fn drop(&mut self) {
+        // Also what cleans up after a `Compositor`: its own `Drop` stops sway
+        // first, then this runs as its `Pending` field goes.
+        fs::remove_dir_all(&self.runtime_dir).ok();
+    }
+}
+
+pub struct Compositor {
+    /// The runtime dir this instance's sockets live in, and the config and
+    /// process helpers that need it. A field so that stopping sway comes first
+    /// and deleting the dir second.
+    pending: Pending,
+    process: Child,
+    /// sway's IPC socket, named after its pid, so only discoverable once started.
+    sway_sock: PathBuf,
+    wayland_sock: PathBuf,
+    output_count: u32,
+}
+
+impl Compositor {
+    pub fn new() -> Self {
+        Pending::new().start_sway()
     }
 
     /// Creates one virtual output and returns its name (e.g. `"HEADLESS-1"`).
@@ -149,33 +254,13 @@ impl Compositor {
     /// Spawns `wltile daemon --systemd` against this compositor, returning a handle
     /// used to signal and observe it.
     pub fn spawn_daemon(&self, config_path: &Path) -> Daemon {
-        let log_path = self.runtime_dir.join("daemon.log");
-        let log = File::create(&log_path).expect("failed to create daemon log");
-        let child = self
-            .wltile_command()
-            .args([
-                "-vvv",
-                "daemon",
-                // keeps the process in the foreground instead of forking, so it stays a controllable
-                // child here.
-                "--systemd",
-                "--config",
-                config_path.to_str().expect("config path must be utf-8"),
-            ])
-            .stdout(log.try_clone().expect("failed to clone daemon log"))
-            .stderr(log)
-            .spawn()
-            .expect("failed to spawn wltile daemon");
-
-        Daemon::new(child, log_path)
+        self.pending
+            .spawn_daemon_at(&self.wayland_display_name(), config_path)
     }
 
     /// A `Command` for the `wltile` binary, pointed at this compositor instance.
     fn wltile_command(&self) -> Command {
-        let mut cmd = Command::new(env!("CARGO_BIN_EXE_wltile"));
-        cmd.env("WAYLAND_DISPLAY", self.wayland_display_name())
-            .env("XDG_RUNTIME_DIR", &self.runtime_dir);
-        cmd
+        self.pending.command(&self.wayland_display_name())
     }
 
     /// Injects a single key press (types `x`) into whichever surface currently
@@ -183,7 +268,7 @@ impl Compositor {
     pub fn press_key(&self) {
         Command::new("wtype")
             .env("WAYLAND_DISPLAY", self.wayland_display_name())
-            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+            .env("XDG_RUNTIME_DIR", self.runtime_dir())
             .arg("x")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -204,16 +289,14 @@ impl Compositor {
         swaymsg::parse_outputs(&result.stdout)
     }
 
-    /// The isolated `XDG_RUNTIME_DIR` this compositor instance runs under.
+    /// The isolated `XDG_RUNTIME_DIR` this instance runs under.
     pub fn runtime_dir(&self) -> &Path {
-        &self.runtime_dir
+        self.pending.runtime_dir()
     }
 
     /// Writes a TOML daemon config into this instance's runtime dir and returns its path.
     pub fn write_config(&self, contents: &str) -> PathBuf {
-        let path = self.runtime_dir.join("config.toml");
-        fs::write(&path, contents).expect("failed to write daemon config");
-        path
+        self.pending.write_config(contents)
     }
 
     /// Polls `outputs()` until `predicate` is satisfied or `timeout` elapses.
@@ -233,8 +316,8 @@ impl Compositor {
     /// internal view of the output-manager `serial` can lag behind what
     /// `swaymsg` already reports on the compositor side. A single SIGHUP sent
     /// right after observing a prior change via `swaymsg` can race that lag:
-    /// the daemon builds its next commit from a stale serial and the
-    /// compositor silently rejects it. Resending on each poll absorbs this
+    /// the daemon builds its next commit from a stale serial and the compositor
+    /// silently rejects it. Resending on each poll absorbs this
     /// without depending on exact timing.
     pub fn reload_until(
         &self,
@@ -267,7 +350,7 @@ impl Compositor {
         let mut cmd = Command::new("swaymsg");
         cmd.arg("-s")
             .arg(&self.sway_sock)
-            .env("XDG_RUNTIME_DIR", &self.runtime_dir)
+            .env("XDG_RUNTIME_DIR", self.runtime_dir())
             .args(args);
 
         run_bounded(
@@ -282,6 +365,5 @@ impl Drop for Compositor {
     fn drop(&mut self) {
         self.process.kill().ok();
         self.process.wait().ok();
-        fs::remove_dir_all(&self.runtime_dir).ok();
     }
 }
