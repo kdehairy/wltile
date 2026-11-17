@@ -1,4 +1,5 @@
 [![crates.io](https://img.shields.io/crates/v/wltile.svg)](https://crates.io/crates/wltile)
+[![AUR](https://img.shields.io/aur/version/wltile.svg)](https://aur.archlinux.org/packages/wltile)
 [![CI](https://github.com/kdehairy/wltile/actions/workflows/ci.yml/badge.svg)](https://github.com/kdehairy/wltile/actions/workflows/ci.yml)
 
 # Overview
