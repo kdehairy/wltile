@@ -10,8 +10,19 @@
 - `wltile position` with `top-of`/`bottom-of` and no alignment now uses `align-left` instead of
   failing with "Impossible to align bottom on a vertical setup" — a mismatch invented by the
   `align-bottom` default nobody had typed. `left-of`/`right-of` keep defaulting to `align-bottom`.
+- A `--config` path that does not exist is a startup error naming the path. The default
+  `$XDG_CONFIG_HOME/wltile/config.toml` is still created empty.
 
 ### Fixed
+- Panicking at startup when no compositor was reachable. The daemon waits instead, retrying once a
+  second and doubling to 30s, and applies its config once a compositor appears.
+- Panicking on an unreadable config file, invalid TOML, or a property of the wrong type. Logged, and
+  that reload skipped.
+- Panicking at startup when a log file could not be opened, or when `--config` named a path that is
+  not a regular file.
+- Any panic inside a reload ending the reload thread. Panics are caught and logged, and the next
+  reload proceeds.
+- Panicking instead of reading the cached output state after another thread had poisoned it.
 - Config files accepted a position combining a relation and an alignment on the same axis
   (`position = "top-of eDP-1 align-top"`), which laid the outputs on top of each other. The pair
   is now rejected in `wltile-core`, so the daemon's config file and the CLI report the same error.

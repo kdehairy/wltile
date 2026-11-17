@@ -92,7 +92,6 @@ pub struct ConfigurationsReadLock {
 
 impl ConfigurationsReadLock {
     /// The cached compositor state, as of whatever the main queue has dispatched.
-
     pub fn read(&self) -> RwLockReadGuard<'_, Configurations> {
         self.configurations
             .read()
