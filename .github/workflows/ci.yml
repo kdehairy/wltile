@@ -101,7 +101,12 @@ jobs:
           pkgname: wltile
           pkgbuild: pkg/aur/PKGBUILD
           updpkgsums: true
-          test: true
+          # No `test: true`. The action runs in its own archlinux:base container, which has
+          # makepkg but no Rust toolchain, and the test it runs passes `--nodeps`, so
+          # `prepare()` dies on `cargo fetch` with "cargo: command not found" — and a step
+          # installed here cannot put a binary inside that container. The build itself is
+          # covered by the rust-latest and integration-test jobs, and a real Arch build by
+          # the AUR build servers and whoever installs the package.
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
