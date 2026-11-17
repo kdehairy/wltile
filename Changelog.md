@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [v1.4.0]
+Released with `wltile-core` v0.2.0.
+
 ### Changed
 - `wl_config::Position`'s fields are private, with `Position::new` as the only constructor: it
   rejects a relation and an alignment on the same axis, so every `Position` that exists can be
@@ -139,7 +142,8 @@
 - position two displays relative to each other either left or right.
 - while positioning the displays, align them to bottom or top.
 
-[unreleased]: https://github.com/kdehairy/wltile/compare/v1.3.3...main
+[unreleased]: https://github.com/kdehairy/wltile/compare/v1.4.0...main
+[v1.4.0]: https://github.com/kdehairy/wltile/compare/v1.3.3...v1.4.0
 [v1.3.3]: https://github.com/kdehairy/wltile/compare/v1.3.2...v1.3.3
 [v1.3.2]: https://github.com/kdehairy/wltile/compare/v1.3.1...v1.3.2
 [v1.3.1]: https://github.com/kdehairy/wltile/compare/v1.3.0...v1.3.1
