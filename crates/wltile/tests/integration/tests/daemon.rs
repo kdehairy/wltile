@@ -3,8 +3,13 @@ use std::time::Duration;
 
 use super::find_output;
 use crate::harness::Compositor;
+use crate::harness::Pending;
 
 const RELOAD_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a waiting daemon gets to notice a compositor that appears: by the
+/// time these tests bring sway up it is in a 4s or 8s backoff sleep, and the
+/// point is that it notices on its own rather than being poked.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[test]
 fn daemon_applies_config_on_sighup() {
@@ -448,6 +453,99 @@ scale = 2
     assert!(
         daemon.is_alive(),
         "expected the daemon to still be running, log:\n{}",
+        daemon.log(),
+    );
+}
+
+// Starting before the compositor exists is the normal case for a daemon brought
+// up by a session's service manager, and a compositor that is restarting looks
+// the same from here: nothing to connect to, for a while.
+
+/// The daemon used to panic on the missing socket, which meant a machine that
+/// started wltile alongside its compositor had a daemon that ran for seconds and
+/// applied nothing until it was restarted into the same race.
+#[test]
+fn daemon_waits_for_a_compositor_that_appears_later() {
+    let pending = Pending::new();
+    let config_path = pending.write_config(
+        r"
+[HEADLESS-1]
+scale = 2
+",
+    );
+    let mut daemon = pending.spawn_daemon(&config_path);
+
+    // Three retries deep — 1s, then 2s, then 4s after start — it is still a
+    // running process saying what it cannot reach and when it will look again.
+    let waiting = daemon.wait_for_log(RELOAD_TIMEOUT * 2, |log| {
+        log.contains("no compositor to talk to") && log.contains("trying again in 4s")
+    });
+    assert!(
+        waiting,
+        "expected the daemon to report it could not reach a compositor and to retry with a \
+         growing wait, log:\n{}",
+        daemon.log(),
+    );
+    assert!(
+        daemon.is_alive(),
+        "expected the daemon to stay up with no compositor at all, log:\n{}",
+        daemon.log(),
+    );
+
+    // No SIGHUP, no restart: sway alone. HEADLESS-1 is the output sway's headless
+    // backend always starts with, so the config has something to apply the moment
+    // there is a compositor to apply it to.
+    let comp = pending.start_sway();
+
+    let applied = comp.wait_for_outputs(CONNECT_TIMEOUT, |outputs| {
+        outputs
+            .iter()
+            .any(|o| o.name == "HEADLESS-1" && (o.scale - 2.0).abs() < 0.01)
+    });
+    assert!(
+        applied,
+        "expected the daemon to notice the compositor on its own and apply the config it had been \
+         waiting with, outputs: {:?}, log:\n{}",
+        comp.outputs(),
+        daemon.log(),
+    );
+    assert!(
+        daemon.is_alive(),
+        "expected the daemon to be running now that it has a compositor, log:\n{}",
+        daemon.log(),
+    );
+}
+
+/// Waiting must not make the daemon unkillable: a start the user regrets is
+/// cancelled with the same signal as any other, and cleanly.
+#[test]
+fn daemon_stops_gracefully_while_waiting_for_a_compositor() {
+    let pending = Pending::new();
+    let config_path = pending.write_config("");
+    let mut daemon = pending.spawn_daemon(&config_path);
+
+    // Send SIGTERM only once it is demonstrably waiting. Before the daemon
+    // installs its handlers, SIGTERM's default disposition would end it for a
+    // reason this test is not about.
+    let waiting = daemon.wait_for_log(RELOAD_TIMEOUT, |log| log.contains("trying again"));
+    assert!(
+        waiting,
+        "expected the daemon to be waiting for a compositor, log:\n{}",
+        daemon.log(),
+    );
+
+    daemon.terminate();
+    let status = daemon.wait_for_exit(RELOAD_TIMEOUT);
+
+    assert!(
+        status.is_some(),
+        "expected the daemon to exit within {RELOAD_TIMEOUT:?} of SIGTERM, without waiting out \
+         its retry first, log:\n{}",
+        daemon.log(),
+    );
+    assert!(
+        status.unwrap().success(),
+        "expected a clean exit (status 0) from a SIGTERM received while waiting, log:\n{}",
         daemon.log(),
     );
 }

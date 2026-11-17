@@ -91,8 +91,11 @@ pub struct ConfigurationsReadLock {
 }
 
 impl ConfigurationsReadLock {
+    /// The cached compositor state, as of whatever the main queue has dispatched.
     pub fn read(&self) -> RwLockReadGuard<'_, Configurations> {
-        self.configurations.read().unwrap()
+        self.configurations
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 }
 
@@ -243,5 +246,47 @@ impl Client {
 impl Drop for Client {
     fn drop(&mut self) {
         self.output_manager.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, RwLock};
+    use std::thread;
+
+    use super::{ConfigurationsReadLock, output::configs::Configurations};
+
+    /// Reading a poisoned cache is what the daemon does on every reload, so the
+    /// read has to survive what poisoned it: another thread dying while holding the
+    /// lock.
+    #[test]
+    fn a_poisoned_cache_is_read_for_what_it_holds_rather_than_poisoning_the_reader() {
+        let lock = ConfigurationsReadLock {
+            configurations: Arc::new(RwLock::new(Configurations::default())),
+        };
+
+        let writer = {
+            let configurations = lock.configurations.clone();
+            thread::spawn(move || {
+                let _held = configurations
+                    .write()
+                    .expect("not poisoned until this thread dies");
+                // The default panic hook prints this line to stderr while the test
+                // runs; it is what poisons the lock, not a test that panicked.
+                panic!("a writer died holding the cache");
+            })
+        };
+        assert!(
+            writer.join().is_err(),
+            "the writer above is meant to panic — that is the only thing that poisons a lock"
+        );
+
+        let configurations = lock.read();
+        assert!(
+            configurations
+                .heads()
+                .is_ok_and(|heads| heads.heads().is_empty()),
+            "a poisoned cache still says what it said before its writer died"
+        );
     }
 }

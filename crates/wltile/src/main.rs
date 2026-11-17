@@ -94,6 +94,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             log,
             err_log,
             systemd,
-        } => daemon::run(config, log, err_log, systemd),
+        } => daemon::run(
+            config.as_deref(),
+            log.as_deref(),
+            err_log.as_deref(),
+            systemd,
+        ),
     }
 }
